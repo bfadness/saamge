@@ -81,7 +81,7 @@ find_package(LAPACK REQUIRED)
 list(APPEND TPL_LIBRARIES ${LAPACK_LIBRARIES})
 
 # bulk includes (for fortran stuff...)
-list(APPEND TPL_LIBRARIES "gfortran")
+list(APPEND TPL_LIBRARIES "/usr/local/gfortran/lib/libgfortran.a")
 
 # MFEM
 find_path(MFEM_INCLUDE_PATH mfem.hpp
