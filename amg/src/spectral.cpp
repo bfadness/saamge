@@ -297,7 +297,7 @@ bool Eigensolver::SolveIterative(
     SA_ASSERT(SA_REAL_ALMOST_LE(theta, lmax));
     SA_ASSERT(theta >= 0.);
     // Build the weighted l1-smoother for the eigenvalue problem if not given.
-    if(!B) B = mbox_snd_D_sparse_from_sparse(A);
+    if(!B) B = mbox_snd_D_sparse_from_sparse(static_cast<const mfem::SparseMatrix&>(A));
 
     SA_ASSERT(B->Width() == B->Size());
     SA_ASSERT(B->Width() == A.Width());
@@ -311,7 +311,7 @@ bool Eigensolver::SolveIterative(
     int num_arnoldi = (A.Width() < 4*max_arpack_vectors) ? A.Width() : 4*max_arpack_vectors;
     if (A.Width() < max_arpack_vectors) max_arpack_vectors = A.Width();
     cut_ptr = &cut_helper;
-    const SparseMatrix *As = dynamic_cast<SparseMatrix *>(&A);
+    const SparseMatrix *As = dynamic_cast<const SparseMatrix *>(&A);
     SA_ASSERT(As); // It is currently only implemented for sparse matrices
     int numvectors = arpacks_calc_portion_eigens_sparse_diag(
         *As, evals, *cut_ptr, *B, (fixed_num > 0 ? fixed_num : max_arpack_vectors), true,
