@@ -141,12 +141,12 @@ option(USE_ARPACK "Should ARPACK be enabled?" ON)
 if (USE_ARPACK)
   find_path(ARPACK_INCLUDE_PATH argsym.h
     HINTS ${ARPACKPP_DIR}/include $ENV{ARPACK_DIR}/include)
-  set(ARPACK_LIB_NAME libarpack.a)
+  set(ARPACK_LIB_NAME libarpack.dylib)
   find_path(ARPACK_LIBRARY_PATH ${ARPACK_LIB_NAME}
              HINTS ${ARPACK_DIR}/lib
                    ${ARPACK_DIR}/lib64
                    $ENV{ARPACK_DIR}/lib)
-  include_directories(${ARPACK_INCLUDE_PATH})
+  include_directories(SYSTEM ${ARPACK_INCLUDE_PATH})
   add_library(ARPACK_LIB STATIC IMPORTED)
   set_property(TARGET ARPACK_LIB PROPERTY IMPORTED_LOCATION
     ${ARPACK_LIBRARY_PATH}/${ARPACK_LIB_NAME})
