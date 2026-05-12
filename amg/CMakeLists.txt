@@ -38,7 +38,7 @@
 ###
 # setup the basics
 ###
-cmake_minimum_required(VERSION 2.8.11 FATAL_ERROR)
+cmake_minimum_required(VERSION 3.5 FATAL_ERROR)
 set(PROJECT_NAME saamge)
 project(${PROJECT_NAME})
 set(HOME_DIR $ENV{HOME})
