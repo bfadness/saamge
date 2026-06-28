@@ -404,6 +404,7 @@ tg_data_t *tg_init_data(
     int nu_pro, int nu_relax, double theta, bool smooth_interp, 
     double smooth_drop_tol, bool use_arpack)
 {
+    std::cout << "<<<< tg_init_data L402 tg.cpp" << std::endl;
     tg_data_t *tg_data = new tg_data_t;
     SA_ASSERT(tg_data);
     memset(tg_data, 0, sizeof(*tg_data));
@@ -505,6 +506,7 @@ void tg_build_hierarchy(HypreParMatrix& Ag, tg_data_t& tg_data,
                         ElementMatrixProvider *elem_data,
                         bool avoid_ess_bdr_dofs, int fixed_num_evecs, int svd_min_skip)
 {
+    std::cout << "<<<< tg_build_hierarchy L503 tg.cpp" << std::endl;
     double useless_parameter = 0.; // Essentially, not used.
 
     //XXX: Currently, we see no reason to actually compute all eigenpairs.

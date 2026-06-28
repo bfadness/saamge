@@ -232,6 +232,7 @@ interp_data_t *interp_init_data(
     const agg_partitioning_relations_t& agg_part_rels, int nu_pro, 
     bool use_arpack, bool scaling_P)
 {
+    std::cout << "<<<< interp_init_data L231 interp.cpp" << std::endl;
     const int nparts = agg_part_rels.nparts;
     interp_data_t *interp_data = new interp_data_t;
     SA_ASSERT(interp_data);
@@ -380,6 +381,7 @@ void interp_compute_vectors(
     const Vector *xbad, bool transf, bool readapting,
     bool all_eigens, bool spect_update, bool bdr_cond_imposed, int fixed_num_evecs)
 {
+    std::cout << "<<<< interp_compute_vectors L376 interp.cpp" << std::endl;
     // const bool assemble_ess_diag = true;
     const int nparts = agg_part_rels.nparts;
 
@@ -444,13 +446,16 @@ void interp_compute_vectors(
                 AEs_stiffm[i] = NULL;
             }
             SA_ASSERT(!AEs_stiffm[i]); // we demand to assemble these ourselves
+            std::cout << "<<<< Assemble AE " << i << " stiffness matrix L450" << std::endl;
             AEs_stiffm[i] = elem_data->BuildAEStiff(i);
         }
         AE_stiffm = AEs_stiffm[i];
         SA_ASSERT(AE_stiffm);
         if (agg_part_rels.testmesh &&
-            !elem_data->IsGeometric())
+        //     !elem_data->IsGeometric())
+             elem_data->IsGeometric())
         {
+            std::cout << "<<<< Save the AE " << i << " stiffness matrix in a file" << std::endl;
             std::stringstream filename;
             filename << "AE_stiffm_" << i << "." << PROC_RANK << ".mat";
             std::ofstream out(filename.str().c_str());
@@ -518,6 +523,7 @@ void interp_compute_vectors(
         } 
         else
         {
+            std::cout << "<<<< Allocate memory for the matrix of cut vectors L522" << std::endl;
             // Simply allocate memory for the matrix of cut vectors.
             // This is in case the hierarchy is being built from scratch.
             SA_ASSERT(!cut_evects_arr[i]);
@@ -534,6 +540,7 @@ void interp_compute_vectors(
 
         if (spect_update)
         {
+            std::cout << "<<<< Solve local eigenvalue problem L539" << std::endl;
             int agg_size = -1; // this only has any effect if we are doing the schur eigenproblem...
             if (agg_part_rels.mises_size != NULL)
                 agg_size = agg_part_rels.mises_size[i];
@@ -903,6 +910,7 @@ SparseMatrix *interp_sparse_tent_build(
     bool transf, bool readapting, bool all_eigens, bool spect_update,
     bool avoid_ess_bdr_dofs, int fixed_num_evecs, int svd_min_skip)
 {
+    std::cout << "<<<< interp_sparse_tent_build L899 interp.cpp" << std::endl;
     SA_RPRINTF_L(0,4, "%s", "---------- interp_compute_vectors { --------------"
                  "-----\n");
 

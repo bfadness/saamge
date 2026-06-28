@@ -391,6 +391,8 @@ ml_data_t * ml_produce_data(
     SA_ASSERT(mlp.get_num_coarsenings() > 0);
     SA_ASSERT(agg_part_rels);
 
+    std::cout << "<<<< ml_produce_data L382 ml.cpp" << std::endl;
+
     // Coarsen the finest level.
     SA_RPRINTF_L(0,4,"%s", "---------- ml_produce_all { ---------------------\n");
     if (SA_IS_OUTPUT_LEVEL(5))
@@ -443,6 +445,7 @@ ml_data_t * ml_produce_data(
     }
     else
     {
+        std::cout << "<<<< else statement L445 ml.cpp" << std::endl;
         tg_build_hierarchy(Ag, *tg_data, *agg_part_rels,
                            elem_data_finest, mlp.get_avoid_ess_bdr_dofs(), mlp.get_fixed_num_evecs(0), mlp.get_svd_min_skip());
     }

@@ -1697,6 +1697,8 @@ void agg_create_partitioning_tables(
     Transpose(*(agg_part_rels->AE_to_dof), *(agg_part_rels->dof_to_AE));
     agg_build_glob_to_AE_id_map(*agg_part_rels);
 
+    std::cout << "Inside agg_create_partitioning tables, and bool testmesh = " << agg_part_rels->testmesh << std::endl;
+
     if (agg_part_rels->testmesh)
     {
         std::stringstream filename;

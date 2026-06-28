@@ -255,6 +255,11 @@ fem_create_test_partitioning(HypreParMatrix& A, ParFiniteElementSpace& fes,
         SA_ASSERT(false);
     }
 
+    std::cout << "partitioning_array:";
+    for (int i=0; i<12; ++i)
+        std::cout << " " << partitioning[i];
+    std::cout << std::endl;
+
     // in what follows, bdr_dofs is only used as info to copy onto coarser level, 
     // does not actually affect partitioning
     agg_partitioning_relations_t *agg_part_rels =
@@ -313,10 +318,10 @@ int main(int argc, char *argv[])
     ml_data_t *ml_data;
 
     OptionsParser args(argc, argv);
-    const char *mesh_file = "/home/barker29/meshes/mltest.mesh";
+    const char *mesh_file = "/Users/bfadness/src/forks/saamge/amg/test/mltest.mesh";
     args.AddOption(&mesh_file, "-m", "--mesh",
                    "Mesh file to use.");
-    const char *perm_file = "/g/g14/barker29/spe10/spe_perm.dat";
+    const char *perm_file = "/Users/bfadness/src/forks/saamge/amg/data/spe_perm.dat";
     args.AddOption(&perm_file, "-pf", "--perm",
                    "Permeability data, only relevant with --spe10.");
     bool visualize = true;
@@ -464,11 +469,12 @@ int main(int argc, char *argv[])
     }
     else
     {
-        // Read the mesh from the given mesh file.
+        std::cout << "Read mesh from the given file" << std::endl;
         mesh = fem_read_mesh(mesh_file);
         if (mesh->GetNV() == 20 && mesh->GetNE() == 12 && 
             times_refine == 0 && serial_times_refine == 0) // not very general...
             mltest = true;
+        std::cout << "bool mltest = " << mltest << std::endl;
     }
     fem_refine_mesh_times(serial_times_refine, *mesh);
 
@@ -480,7 +486,9 @@ int main(int argc, char *argv[])
     ess_bdr = 0;
     if (mltest)
     {
-        ess_bdr[3] = 1; // marked as 4 in mltest.mesh, but MFEM subtracts 1 because it's insane
+        // ess_bdr[3] = 1; // marked as 4 in mltest.mesh, but MFEM subtracts 1 because it's insane
+        ess_bdr = 1;
+        std::cout << "<<<< Make sure Dirichlet boundary" << std::endl;
     }
     else if (spe10)
     {
@@ -515,6 +523,7 @@ int main(int argc, char *argv[])
     else
     {
         fec = new H1_FECollection(order);
+        // fec = new CrouzeixRaviartFECollection();
         fes = new ParFiniteElementSpace(pmesh, fec);
     }
     int pNV = pmesh->GetNV();
@@ -523,6 +532,14 @@ int main(int argc, char *argv[])
     int ND = fes->GlobalTrueVSize();
     SA_RPRINTF(0,"pNV: %d, pNE: %d, pND: %d, ND: %d\n", 
                pNV, pNE, pND, ND);
+
+    {
+        std::stringstream filename;
+        filename << "pmesh." << PROC_RANK << ".mesh";
+        std::ofstream out(filename.str().c_str());
+        pmesh->ParPrint(out);
+    }
+
 
     FiniteElementCollection * cfec = new L2_FECollection(0, pmesh->Dimension());
     ParFiniteElementSpace * cfes = new ParFiniteElementSpace(pmesh, cfec);
@@ -617,6 +634,12 @@ int main(int argc, char *argv[])
     }
 
     SparseMatrix& Al = a->SpMat();
+    {
+        std::stringstream filename;
+        filename << "global_stiffness." << PROC_RANK << ".mat";
+        std::ofstream out(filename.str().c_str());
+        Al.Print(out);
+    }
     HypreParMatrix *Ag = a->ParallelAssemble();
     HypreParVector *bg = b->ParallelAssemble();
     HypreParVector *hxg = x.ParallelAverage();
@@ -672,6 +695,7 @@ int main(int argc, char *argv[])
     {
         nparts_arr[0] = 4 / PROC_NUM;
         const bool do_aggregates_here = do_aggregates && (num_levels == 2);
+        std::cout << "Get the aggregate test mesh partition relations ..." << std::endl;
         agg_part_rels = fem_create_test_partitioning(
             *Ag, *fes, bdr_dofs, nparts_arr, do_aggregates_here);
         if (num_levels > 2)
@@ -692,6 +716,7 @@ int main(int argc, char *argv[])
         }
         else
         {
+            std::cout << "Get the aggregate partition relations ..." << std::endl;
             agg_part_rels = fem_create_partitioning(
                 *Ag, *fes, bdr_dofs, nparts_arr, do_aggregates_here);
         }

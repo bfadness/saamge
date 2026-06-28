@@ -35,6 +35,8 @@
 #include <cmath>
 #include <fstream>
 #include <sstream>
+#include <bitset>
+#include <iomanip>
 #include <cfloat>
 #include <algorithm>
 #include <mfem.hpp>
@@ -101,27 +103,26 @@ agg_dof_status_t *fem_find_bdr_dofs(ParFiniteElementSpace& fes,
 
     Table &group_ldof = fes.GroupComm().GroupLDofTable();
     const int ngroups = group_ldof.Size();
-    // const int n_ldofs = group_ldof.Width(); // = 0 in serial
+    const int n_ldofs = group_ldof.Width(); // = 0 in serial
 
-    // std::cout << "<<<< ND = fes.GetVSize() = " << ND << ", fes.GetNDofs() = " << fes.GetNDofs()
-    //        << ", n_ldofs = " << n_ldofs << std::endl;
+    std::cout << "<<<< ND = fes.GetVSize() = " << ND << ", fes.GetNDofs() = " << fes.GetNDofs()
+           << ", n_ldofs = " << n_ldofs << std::endl;
 
-    // int count = 0;
+    int count = 0;
     for (int i=0; i < ND; ++i)
     {
         if (ess_dofs[i])
         {
             SA_SET_FLAGS(bdr_dofs[i], AGG_ON_ESS_DOMAIN_BORDER_FLAG);
-            // std::cout << "      <<<< set ess flag on dof " << i << std::endl;
-            // count++;
+            count++;
         }
         if (-1 != fes.GetLocalTDofNumber(i))
             SA_SET_FLAGS(bdr_dofs[i], AGG_OWNED_FLAG);
     }
-    // std::cout << "<<<< count " << count << " bdr dofs" << std::endl;
+    std::cout << "<<<< count " << count << " bdr dofs" << std::endl;
 
     int max_ldof = -1;
-    // std::cout << "<<<< ngroups = " << ngroups << std::endl;
+    std::cout << "<<<< ngroups = " << ngroups << std::endl;
     for (int gr=1; gr < ngroups; ++gr)
     {
         const int *ldofs = group_ldof.GetRow(gr);
@@ -135,7 +136,12 @@ agg_dof_status_t *fem_find_bdr_dofs(ParFiniteElementSpace& fes,
             SA_SET_FLAGS(bdr_dofs[ldofs[i]], AGG_ON_PROC_IFACE_FLAG);
         }
     }
-    // std::cout << "<<<< max_ldof = " << max_ldof << std::endl;
+    std::cout << "<<<< max_ldof = " << max_ldof << std::endl;
+    std::cout << "<<<< bdr_dofs:\n";
+    for (int i=0; i < ND; ++i)
+        std::cout << std::setw(4) << std::left << i << " "
+                  << std::bitset<8>(bdr_dofs[i]) << " " << int(bdr_dofs[i]) << "\n";
+    std::cout << std::endl;
 
     return bdr_dofs;
 }
