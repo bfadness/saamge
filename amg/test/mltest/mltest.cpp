@@ -533,13 +533,9 @@ int main(int argc, char *argv[])
     SA_RPRINTF(0,"pNV: %d, pNE: %d, pND: %d, ND: %d\n", 
                pNV, pNE, pND, ND);
 
-    {
-        std::stringstream filename;
-        filename << "pmesh." << PROC_RANK << ".mesh";
-        std::ofstream out(filename.str().c_str());
-        pmesh->ParPrint(out);
-    }
-
+    ofstream mesh_ofs("mltest.mesh");
+    mesh_ofs.precision(8);
+    pmesh->Print(mesh_ofs);
 
     FiniteElementCollection * cfec = new L2_FECollection(0, pmesh->Dimension());
     ParFiniteElementSpace * cfes = new ParFiniteElementSpace(pmesh, cfec);
@@ -675,6 +671,10 @@ int main(int argc, char *argv[])
     delete pcg;
     delete hbamg;
     x = *hxg;
+    ofstream solh_ofs("solh.gf");
+    solh_ofs.precision(8);
+    x.Save(solh_ofs);
+
     if (false)
         fem_parallel_visualize_gf(*pmesh, x);
     SA_RPRINTF(0, "TIMING: setup and solve with Hypre BoomerAMG preconditioned CG %f seconds.\n", 
@@ -811,6 +811,10 @@ int main(int argc, char *argv[])
             SA_RPRINTF(0, "Outer PCG failed to converge after %d iterations!\n",
                        iterations);
         x = *pxg;
+        ofstream solp_ofs("solp.gf");
+        solp_ofs.precision(8);
+        x.Save(solp_ofs);
+
         if (false)
             fem_parallel_visualize_gf(*pmesh, x);
         chrono.Stop();
