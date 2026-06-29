@@ -174,10 +174,20 @@ double checkboard_coef(Vector& x)
     }
 }
 
+
+double tau(2*M_PI);
+
+double sol_func(Vector& x)
+{
+    const double xi(x(0));
+    const double xj(x(1));
+    return sin(tau*xi) * sin(tau*xj);
+}
+
 double rhs_func(Vector& x)
 {
     SA_ASSERT(2 <= x.Size() && x.Size() <= 3);
-    return 1;
+    return 2*pow(tau, 2) * sol_func(x);
 }
 
 double bdr_cond(Vector& x)
