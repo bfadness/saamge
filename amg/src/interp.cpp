@@ -931,6 +931,13 @@ SparseMatrix *interp_sparse_tent_build(
     SparseMatrix *tent_interp;
     tent_interp = interp_sparse_tent_assemble(agg_part_rels, interp_data,
                                               avoid_ess_bdr_dofs, svd_min_skip);
+    {
+        std::cout << "<<<< Save the tentative interpolant sparse matrix in a file" << std::endl;
+        std::stringstream filename;
+        filename << "tent_interp." << PROC_RANK << ".mat";
+        std::ofstream out(filename.str().c_str());
+        tent_interp->Print(out);
+    }
 
     SA_RPRINTF_L(0,4, "%s", "---------- } interp_sparse_tent_assemble -----------"
                  "---\n");
