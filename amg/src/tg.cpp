@@ -989,6 +989,7 @@ void tg_update_coarse_operator(mfem::HypreParMatrix& A, tg_data_t *tg_data,
 
     tg_free_coarse_operator(*tg_data);
 
+    std::cout << "<<<< tg_coarse_matr L992 tg.cpp" << std::endl;
     tg_data->Ac = tg_coarse_matr(A, *(tg_data->interp));
     if (perform_solve_init)
     {

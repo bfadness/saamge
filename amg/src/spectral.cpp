@@ -103,6 +103,7 @@ bool Eigensolver::Solve(
     if (problem_size <= threshold)
     {
         count_direct_solves++;
+        std::cout << "<<<< SolveDirect L107 spectral.cpp" << std::endl;
         return SolveDirect(A, B, part, agg_id, aggregate_size,
                            theta, cut_evects, 
                            NULL, transf, all_eigens, fixed_num);
