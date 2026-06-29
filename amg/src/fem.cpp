@@ -137,11 +137,11 @@ agg_dof_status_t *fem_find_bdr_dofs(ParFiniteElementSpace& fes,
         }
     }
     std::cout << "<<<< max_ldof = " << max_ldof << std::endl;
-    std::cout << "<<<< bdr_dofs:\n";
-    for (int i=0; i < ND; ++i)
-        std::cout << std::setw(4) << std::left << i << " "
-                  << std::bitset<8>(bdr_dofs[i]) << " " << int(bdr_dofs[i]) << "\n";
-    std::cout << std::endl;
+    // std::cout << "<<<< bdr_dofs:\n";
+    // for (int i=0; i < ND; ++i)
+    //     std::cout << std::setw(4) << std::left << i << " "
+    //               << std::bitset<8>(bdr_dofs[i]) << " " << int(bdr_dofs[i]) << "\n";
+    // std::cout << std::endl;
 
     return bdr_dofs;
 }
