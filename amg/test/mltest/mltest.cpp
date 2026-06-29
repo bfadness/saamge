@@ -550,6 +550,7 @@ int main(int argc, char *argv[])
     FiniteElementCollection * cfec = new L2_FECollection(0, pmesh->Dimension());
     ParFiniteElementSpace * cfes = new ParFiniteElementSpace(pmesh, cfec);
 
+    FunctionCoefficient sol(sol_func);
     FunctionCoefficient bdr_coeff(bdr_cond);
     FunctionCoefficient rhs(rhs_func);
 
@@ -681,6 +682,7 @@ int main(int argc, char *argv[])
     delete pcg;
     delete hbamg;
     x = *hxg;
+    std::cout << "<<<< |u_h - u|_2 = " << x.ComputeL2Error(sol) << std::endl;
     ofstream solh_ofs("solh.gf");
     solh_ofs.precision(8);
     x.Save(solh_ofs);
@@ -821,6 +823,7 @@ int main(int argc, char *argv[])
             SA_RPRINTF(0, "Outer PCG failed to converge after %d iterations!\n",
                        iterations);
         x = *pxg;
+        std::cout << "<<<< |u_h - u|_2 = " << x.ComputeL2Error(sol) << std::endl;
         ofstream solp_ofs("solp.gf");
         solp_ofs.precision(8);
         x.Save(solp_ofs);
