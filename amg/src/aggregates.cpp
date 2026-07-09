@@ -523,7 +523,9 @@ int agg_construct_mises_local(agg_partitioning_relations_t& agg_part_rels,
 
     HypreParVector ones(*Dof_to_gAE);
     ones = 1.0;
+    // ones.Print(out, ones.Size());
     HypreParVector rowsum_vector(*Dof_to_gAE, 1);
+    // rowsum_vector.Print(out, rowsum_vector.Size());
     Dof_to_gAE->Mult(ones, rowsum_vector);
 
     int * rowsums = new int[num_local_ldofs];
@@ -533,6 +535,12 @@ int agg_construct_mises_local(agg_partitioning_relations_t& agg_part_rels,
         SA_ASSERT(Dof_to_gAE_diag_I[i+1] - Dof_to_gAE_diag_I[i] +
                   Dof_to_gAE_offd_I[i+1] - Dof_to_gAE_offd_I[i] == rowsums[i]);
     }
+    std::cout << "<<<< rowsums array:";
+    for (int i=0; i<num_local_ldofs; ++i)
+    {
+        std::cout << " " << rowsums[i];
+    }
+    std::cout << std::endl;
 
     // only use sec here to determine ownership of dofs
     SharedEntityCommunication<DenseMatrix> * sec; // maybe non-pointer is safer and better
@@ -576,6 +584,13 @@ int agg_construct_mises_local(agg_partitioning_relations_t& agg_part_rels,
                         count[k]++;
             }
         }
+        std::cout << "<<<< ldof: " << i << " count array:";
+        for (int k=0; k<num_local_ldofs; ++k)
+        {
+            std::cout << " " << count[k];
+        }
+        std::cout << std::endl;
+
         SA_ASSERT(rowsums[i] == count[i]);
 
         Array<int>* newrow = new Array<int>;
@@ -655,7 +670,7 @@ int agg_construct_mises_local(agg_partitioning_relations_t& agg_part_rels,
     for (int i=0; i<num_total_rows; ++i)
        delete rows[i];
 
-    // SA_PRINTF("%s","---agg_construct_mises_local finished---\n");
+    SA_PRINTF("%s","---agg_construct_mises_local finished---\n");
     return num_true_rows;
 }
 
