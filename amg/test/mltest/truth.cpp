@@ -16,14 +16,14 @@ double sol_func(Vector& x)
 
 double rhs_func(Vector &x)
 {
-    SA_ASSERT(2 <= x.Size() && x.Size() <= 3);
+    SA_ASSERT(2 == x.Size());
     return 2*pow(tau, 2) * sol_func(x);
 }
 
 double bdr_cond(Vector &x)
 {
-    SA_ASSERT(2 <= x.Size() && x.Size() <= 3);
-    return 0.;
+    SA_ASSERT(2 == x.Size());
+    return 0.0;
 }
 
 /**
@@ -72,7 +72,7 @@ int *fem_partition_test_mesh(Mesh &mesh, int *nparts)
 {
     SA_ASSERT(*nparts == 4);
 
-    int * out = new int[mesh.GetNE()];
+    int *out = new int[mesh.GetNE()];
     out[0] = out[1] = out[4] = out[5] = 0;
     out[2] = out[3] = 1;
     out[6] = out[7] = out[11] = 2;
@@ -82,32 +82,22 @@ int *fem_partition_test_mesh(Mesh &mesh, int *nparts)
 
 int main(int argc, char *argv[])
 {
-    // Initialize process related stuff.
-    MPI_Init(&argc, &argv);
-    proc_init(MPI_COMM_WORLD);
+    mfem::MPI_Session mpi(argc, argv);
+    const int myid = mpi.WorldRank();
+    const int num_procs = mpi.WorldSize();
+    MPI_Comm active_comm = MPI_COMM_WORLD;
+    proc_init(active_comm);
 
-    StopWatch chrono;
-    chrono.Clear();
-    chrono.Start();
-
-    Mesh *mesh;
-    ParMesh *pmesh;
-    ParGridFunction x;
-    ParLinearForm *b;
-    ParBilinearForm *a;
     agg_partitioning_relations_t *agg_part_rels;
     ml_data_t *ml_data;
 
     OptionsParser args(argc, argv);
     const char *mesh_file = "/Users/bfadness/src/forks/saamge/amg/test/mltest.mesh";
-
     bool visualize = true;
     args.AddOption(&visualize, "-vis", "--visualization", "-no-vis",
                    "--no-visualization",
                    "Enable or disable GLVis visualization.");
     int serial_times_refine = 0;
-    args.AddOption(&serial_times_refine, "-sr", "--serial-refine",
-                   "How many times to refine mesh before parallel partition.");
     int times_refine = 0;
     args.AddOption(&times_refine, "-r", "--refine", 
                    "How many times to refine the mesh (in parallel).");
@@ -140,7 +130,7 @@ int main(int argc, char *argv[])
                    "Number of elements per AE for first (finest) coarsening.");
     int generate_mesh = -1;
     args.AddOption(&generate_mesh, "--generate-mesh", "--generate-mesh",
-                   "Generate 2D quad mesh with this number of elements per side (instead of loading).");
+                   "Generate 2D quad mesh with this number of elements per side.");
     bool minimal_coarse = false;
     bool linear_coarse = false;
     args.AddOption(&linear_coarse, "-lc", "--linear-coarse",
@@ -165,7 +155,7 @@ int main(int argc, char *argv[])
     bool do_aggregates = false;
     args.AddOption(&do_aggregates, "-agg", "--do-aggregates",
                    "-nagg", "--no-do-aggregates",
-                   "On coarsest coarsening, use aggregates instead of MISes for lower complexity.");
+                   "On coarsest level, use aggregates instead of MISes for lower complexity.");
     bool elasticity = false;
     bool identity_partition = false;
     bool adapt = false;
@@ -176,136 +166,125 @@ int main(int argc, char *argv[])
     args.Parse();
     if (!args.Good())
     {
-        if (PROC_RANK == 0)
+        if (0 == myid)
             args.PrintUsage(cout);
         MPI_Finalize();
         return 1;
     }
-    if (PROC_RANK == 0)
+    if (0 == myid)
         args.PrintOptions(cout);
 
     if (first_elems_per_agg < 0) first_elems_per_agg = elems_per_agg;
     if (first_theta < 0.0) first_theta = theta;
     if (first_nu_pro < 0) first_nu_pro = nu_pro;
 
+    // Do not do both corrected nullspace technique and coarse space of just ones vector
     SA_ASSERT(!(correct_nulspace && minimal_coarse));
 
-    MPI_Barrier(PROC_COMM); // try to make MFEM's debug element orientation prints
+    MPI_Barrier(active_comm); // try to make MFEM's debug element orientation prints
                             // not mess up the parameters above
     bool mltest = false;
+    Mesh *mesh;
     if (generate_mesh > 0)
     {
         mesh = new Mesh(generate_mesh, generate_mesh, Element::QUADRILATERAL, 1);
     }
     else
     {
-        std::cout << "Read mesh from the given file" << std::endl;
         mesh = fem_read_mesh(mesh_file);
         if (mesh->GetNV() == 20 && mesh->GetNE() == 12 && 
             times_refine == 0 && serial_times_refine == 0) // not very general...
             mltest = true;
-        std::cout << "bool mltest = " << mltest << std::endl;
+        if (0 == myid)
+            std::cout << "<<<< bool mltest = " << mltest << std::endl;
     }
-    fem_refine_mesh_times(serial_times_refine, *mesh);
-
-    // Serial mesh.
+    const int dim = mesh->Dimension();
+    int nprocs = mpi.WorldSize();
+    float ratio = (float)nprocs/mesh->GetNE();
+    if (ratio > 1)
+    {
+        serial_times_refine = std::ceil(std::log2(ratio)/dim);
+        for (int i=0; i<serial_times_refine; ++i)
+        {
+            mesh->UniformRefinement();
+        }
+    }
     SA_RPRINTF(0,"NV: %d, NE: %d\n", mesh->GetNV(), mesh->GetNE());
 
-    // Parallel mesh and finite elements stuff.
-    Array<int> ess_bdr(mesh->bdr_attributes.Max());
-    ess_bdr = 1;
-
-    int nprocs = PROC_NUM;
-    int *proc_partitioning;
-    proc_partitioning = fem_partition_mesh(*mesh, &nprocs);
-    if (0 == PROC_RANK && visualize)
+    int *proc_partitioning = fem_partition_mesh(*mesh, &nprocs);
+    if (0 == myid && visualize)
         fem_serial_visualize_partitioning(*mesh, proc_partitioning);
-    pmesh = new ParMesh(MPI_COMM_WORLD, *mesh, proc_partitioning);
-    delete [] proc_partitioning;
-    fem_refine_mesh_times(times_refine, *pmesh);
+    ParMesh pmesh(active_comm, *mesh, proc_partitioning);
+    delete mesh;
+    delete []proc_partitioning;
 
-    FiniteElementCollection * fec;
-    ParFiniteElementSpace *fes;
-    fec = new H1_FECollection(order);
-    // fec = new CrouzeixRaviartFECollection();
-    fes = new ParFiniteElementSpace(pmesh, fec);
-    int pNV = pmesh->GetNV();
-    int pNE = pmesh->GetNE();
-    int pND = fes->GetNDofs();
-    int ND = fes->GlobalTrueVSize();
-    SA_RPRINTF(0,"pNV: %d, pNE: %d, pND: %d, ND: %d\n", 
-               pNV, pNE, pND, ND);
+    for (int i=0; i<times_refine; ++i)
+    {
+        pmesh.UniformRefinement();
+    }
+
+    H1_FECollection fec(order, dim);
+    ParFiniteElementSpace fes(&pmesh, &fec);
+
+    const int pNV = pmesh.GetNV();
+    const int pNE = pmesh.GetNE();
+    const int pND = fes.GetNDofs();
+    const int ND = fes.GlobalTrueVSize();
+    SA_RPRINTF(0,"pNV: %d, pNE: %d, pND: %d, ND: %d\n", pNV, pNE, pND, ND);
 
     ofstream mesh_ofs("mltest.mesh");
     mesh_ofs.precision(8);
-    pmesh->Print(mesh_ofs);
+    pmesh.Print(mesh_ofs);
 
     FunctionCoefficient sol(sol_func);
-    FunctionCoefficient bdr_coeff(bdr_cond);
     FunctionCoefficient rhs(rhs_func);
+    ConstantCoefficient conduct_func(1.0);
 
-    Coefficient *conduct_func = new ConstantCoefficient(1.0);
-    // conductivity.ProjectCoefficient(*conduct_func);
-    // conduct_coeff = new GridFunctionCoefficient(&conductivity);
+    ParGridFunction x(&fes);
+    FunctionCoefficient bdr_coeff(bdr_cond);
+    x.ProjectCoefficient(bdr_coeff);
 
-    // true means impose boundary condition
-    fem_build_discrete_problem(fes, rhs, bdr_coeff, *conduct_func, true, 
-                               x, b, a, &ess_bdr);
+    ParLinearForm b(&fes);
+    b.AddDomainIntegrator(new DomainLFIntegrator(rhs));
+    b.Assemble();
 
-    SparseMatrix& Al = a->SpMat();
+    ParBilinearForm a(&fes);
+    a.AddDomainIntegrator(new mfem::DiffusionIntegrator(conduct_func));
+    a.Assemble();
+
+    Array<int> ess_bdr(pmesh.bdr_attributes.Max());
+    ess_bdr = 1;
+    Array<int> ess_dofs_list;
+    fes.GetEssentialVDofs(ess_bdr, ess_dofs_list);
+    const bool keep_diag = true;
+    a.EliminateEssentialBCFromDofs(ess_dofs_list, x, b, keep_diag);
+    a.Finalize(0);
+
+    SparseMatrix &Al = a.SpMat();
     {
         std::stringstream filename;
-        filename << "global_stiffness." << PROC_RANK << ".mat";
+        filename << "global_stiffness" << myid;
         std::ofstream out(filename.str().c_str());
         Al.Print(out);
     }
-    HypreParMatrix *Ag = a->ParallelAssemble();
-    HypreParVector *bg = b->ParallelAssemble();
-    HypreParVector *hxg = x.ParallelAverage();
-    chrono.Stop();
-    SA_RPRINTF(0, "TIMING: fem setup %f seconds.\n", chrono.RealTime());
+    HypreParMatrix Ag = *a.ParallelAssemble();
 
-    // basic solver stuff.
-    chrono.Clear();
-    chrono.Start();
-    SA_RPRINTF(0, "%s", "\n");
-    SA_RPRINTF(0, "%s", "\t\t\tSOLVING THE ORIGINAL FINE SCALE PROBLEM USING HYPRE:\n");
-    SA_RPRINTF(0, "%s", "\n");
-    HypreBoomerAMG *hbamg = new HypreBoomerAMG(*Ag);
-    hbamg->SetPrintLevel(0);
-    hbamg->SetSystemsOptions(pmesh->Dimension());
+    HypreBoomerAMG hbamg(Ag);
+    hbamg.SetPrintLevel(0);
 
-    CGSolver * pcg = new CGSolver(MPI_COMM_WORLD);
-    pcg->SetOperator(*Ag);
-    pcg->SetRelTol(1e-6); // for some reason MFEM squares this...
-    pcg->SetMaxIter(1000);
-    pcg->SetPrintLevel(1);
-    pcg->SetPreconditioner(*hbamg);
+    CGSolver pcg(active_comm);
+    pcg.SetPreconditioner(hbamg);
+    pcg.SetOperator(Ag);
+    pcg.SetRelTol(1e-6); // for some reason MFEM squares this...
+    pcg.SetMaxIter(1000);
+    pcg.SetPrintLevel(2);
 
-    SA_RPRINTF(0, "hxg->Norml2() = %f\n", hxg->Norml2());
-    pcg->Mult(*bg, *hxg);
-    delete pcg;
-    delete hbamg;
-    x = *hxg;
+    SA_RPRINTF(0, "x.Norml2() = %f\n", x.Norml2());
+    pcg.Mult(b, x);
     std::cout << "<<<< |u_h - u|_2 = " << x.ComputeL2Error(sol) << std::endl;
     ofstream solh_ofs("solh.gf");
     solh_ofs.precision(8);
     x.Save(solh_ofs);
-
-    delete hxg;
-    delete bg;
-    delete Ag;
-    delete a;
-    delete b;
-
-    delete fes;
-    delete fec;
-    delete conduct_func;
-
-    delete pmesh;
-    delete mesh;
-
-    MPI_Finalize();
 
     return 0;
 }
