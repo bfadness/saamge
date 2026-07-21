@@ -256,12 +256,11 @@ int main(int argc, char *argv[])
 
     Array<int> ess_bdr(pmesh.bdr_attributes.Max());
     ess_bdr = 1;
-    Array<int> ess_dofs_list;
-    fes.GetEssentialVDofs(ess_bdr, ess_dofs_list);
     const bool keep_diag = true;
-    a.EliminateEssentialBCFromDofs(ess_dofs_list, x, b, keep_diag);
-    a.Finalize(0);
+    a.EliminateEssentialBC(ess_bdr, x, b);
+    a.Finalize();
 
+/*
     SparseMatrix &Al = a.SpMat();
     {
         std::stringstream filename;
@@ -269,20 +268,27 @@ int main(int argc, char *argv[])
         std::ofstream out(filename.str().c_str());
         Al.Print(out);
     }
-    HypreParMatrix Ag = *a.ParallelAssemble();
+*/
+    Vector true_x(fes.GetTrueVSize());
+    true_x = 0.0;
+    Vector true_rhs(true_x.Size());
 
-    HypreBoomerAMG hbamg(Ag);
-    hbamg.SetPrintLevel(0);
+    b.ParallelAssemble(true_rhs);
+    HypreParMatrix A = *a.ParallelAssemble();
+
+    HypreBoomerAMG amg(A);
+    amg.SetPrintLevel(0);
 
     CGSolver pcg(active_comm);
-    pcg.SetPreconditioner(hbamg);
-    pcg.SetOperator(Ag);
+    pcg.SetPreconditioner(amg);
+    pcg.SetOperator(A);
     pcg.SetRelTol(1e-6); // for some reason MFEM squares this...
     pcg.SetMaxIter(1000);
     pcg.SetPrintLevel(2);
+    pcg.Mult(true_rhs, true_x);
+    x.Distribute(true_x);
 
     SA_RPRINTF(0, "x.Norml2() = %f\n", x.Norml2());
-    pcg.Mult(b, x);
     std::cout << "<<<< |u_h - u|_2 = " << x.ComputeL2Error(sol) << std::endl;
     ofstream solh_ofs("solh.gf");
     solh_ofs.precision(8);
