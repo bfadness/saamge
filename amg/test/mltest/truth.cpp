@@ -234,7 +234,9 @@ int main(int argc, char *argv[])
     const int ND = fes.GlobalTrueVSize();
     SA_RPRINTF(0,"pNV: %d, pNE: %d, pND: %d, ND: %d\n", pNV, pNE, pND, ND);
 
-    ofstream mesh_ofs("mltest.mesh");
+    std::ostringstream mesh_name;
+    mesh_name << "mesh." << std::setfill('0') << std::setw(6) << myid;
+    std::ofstream mesh_ofs(mesh_name.str().c_str());
     mesh_ofs.precision(8);
     pmesh.Print(mesh_ofs);
 
@@ -288,11 +290,15 @@ int main(int argc, char *argv[])
     pcg.Mult(true_rhs, true_x);
     x.Distribute(true_x);
 
-    SA_RPRINTF(0, "x.Norml2() = %f\n", x.Norml2());
-    std::cout << "<<<< |u_h - u|_2 = " << x.ComputeL2Error(sol) << std::endl;
-    ofstream solh_ofs("solh.gf");
-    solh_ofs.precision(8);
-    x.Save(solh_ofs);
+    double error = x.ComputeL2Error(sol);
+    if (0 == myid)
+        std::cout << "<<<< |u_h - u|_2 = " << error << std::endl;
+
+    std::ostringstream sol_name;
+    sol_name << "sol." << std::setfill('0') << std::setw(6) << myid;
+    std::ofstream sol_ofs(sol_name.str().c_str());
+    sol_ofs.precision(8);
+    x.Save(sol_ofs);
 
     return 0;
 }
