@@ -68,10 +68,8 @@ fem_create_test_partitioning(HypreParMatrix &A, ParFiniteElementSpace &fes,
     return agg_part_rels;
 }
 
-int *fem_partition_test_mesh(Mesh &mesh, int *nparts)
+int *fem_partition_test_mesh(Mesh &mesh)
 {
-    SA_ASSERT(*nparts == 4);
-
     int *out = new int[mesh.GetNE()];
     out[0] = out[1] = out[4] = out[5] = 0;
     out[2] = out[3] = 1;
@@ -211,7 +209,11 @@ int main(int argc, char *argv[])
     }
     SA_RPRINTF(0,"NV: %d, NE: %d\n", mesh->GetNV(), mesh->GetNE());
 
-    int *proc_partitioning = fem_partition_mesh(*mesh, &nprocs);
+    int *proc_partitioning = nullptr;
+    if (mltest && 4 == num_procs)
+        proc_partitioning = fem_partition_test_mesh(*mesh);
+    else
+        proc_partitioning = fem_partition_mesh(*mesh, &nprocs);
     if (0 == myid && visualize)
         fem_serial_visualize_partitioning(*mesh, proc_partitioning);
     ParMesh pmesh(active_comm, *mesh, proc_partitioning);
