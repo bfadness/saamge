@@ -299,7 +299,7 @@ void fem_serial_visualize_partitioning(Mesh& mesh, int *partitioning,
     sol_sock.precision(CONFIG_ACCESS_OPTION(GLOBAL, prec));
     mesh.PrintWithPartitioning(partitioning, sol_sock, true);
     p.Save(sol_sock);
-    sol_sock << "f" << (2 == mesh.Dimension()?"Rjl":"") << keys;
+    sol_sock << (2 == mesh.Dimension()?"Rjl":"") << keys;
     // sol_sock.send();
     sol_sock.close();
     delete pfes;
