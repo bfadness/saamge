@@ -105,8 +105,7 @@ agg_dof_status_t *fem_find_bdr_dofs(ParFiniteElementSpace& fes,
     const int ngroups = group_ldof.Size();
     const int n_ldofs = group_ldof.Width(); // = 0 in serial
 
-    std::cout << "<<<< ND = fes.GetVSize() = " << ND << ", fes.GetNDofs() = " << fes.GetNDofs()
-           << ", n_ldofs = " << n_ldofs << std::endl;
+    SA_PRINTF("ndofs: %d, ngroups: %d, and n_ldofs: %d\n", ND, ngroups, n_ldofs);
 
     int count = 0;
     for (int i=0; i < ND; ++i)
@@ -119,10 +118,9 @@ agg_dof_status_t *fem_find_bdr_dofs(ParFiniteElementSpace& fes,
         if (-1 != fes.GetLocalTDofNumber(i))
             SA_SET_FLAGS(bdr_dofs[i], AGG_OWNED_FLAG);
     }
-    std::cout << "<<<< count " << count << " bdr dofs" << std::endl;
+    SA_PRINTF("counted %d bdr dofs\n", count);
 
     int max_ldof = -1;
-    std::cout << "<<<< ngroups = " << ngroups << std::endl;
     for (int gr=1; gr < ngroups; ++gr)
     {
         const int *ldofs = group_ldof.GetRow(gr);
@@ -136,7 +134,7 @@ agg_dof_status_t *fem_find_bdr_dofs(ParFiniteElementSpace& fes,
             SA_SET_FLAGS(bdr_dofs[ldofs[i]], AGG_ON_PROC_IFACE_FLAG);
         }
     }
-    std::cout << "<<<< max_ldof = " << max_ldof << std::endl;
+    SA_PRINTF("max_ldof: %d\n", max_ldof);
     // std::cout << "<<<< bdr_dofs:\n";
     // for (int i=0; i < ND; ++i)
     //     std::cout << std::setw(4) << std::left << i << " "
@@ -439,7 +437,7 @@ void fem_parallel_visualize_aggregates(ParFiniteElementSpace *fes,
 
 Mesh *fem_read_mesh(const char *filename)
 {
-    SA_RPRINTF_L(0, 4, "%s", "Loading mesh...\n");
+    SA_RPRINTF_NOTS(0, "%s", "Loading mesh...\n");
     std::ifstream imesh(filename);
     SA_ASSERT(imesh);
     Mesh *mesh = new Mesh(imesh, 1, 1);
