@@ -33,6 +33,8 @@
 #include "aggregates.hpp"
 #include <cmath>
 #include <algorithm>
+#include <iomanip>
+#include <sstream>
 #include <vector>
 #include <mfem.hpp>
 #include "part.hpp"
@@ -535,12 +537,11 @@ int agg_construct_mises_local(agg_partitioning_relations_t& agg_part_rels,
         SA_ASSERT(Dof_to_gAE_diag_I[i+1] - Dof_to_gAE_diag_I[i] +
                   Dof_to_gAE_offd_I[i+1] - Dof_to_gAE_offd_I[i] == rowsums[i]);
     }
-    std::cout << "<<<< rowsums array:";
-    for (int i=0; i<num_local_ldofs; ++i)
-    {
-        std::cout << " " << rowsums[i];
-    }
-    std::cout << std::endl;
+
+    std::ostringstream local_buffer;
+    local_buffer << "rowsums array: ";
+    for (int j=0; j<num_local_ldofs; ++j)
+        local_buffer << rowsums[j] << (j == num_local_ldofs-1 ? "\n" : " ");
 
     // only use sec here to determine ownership of dofs
     SharedEntityCommunication<DenseMatrix> * sec; // maybe non-pointer is safer and better
@@ -584,12 +585,11 @@ int agg_construct_mises_local(agg_partitioning_relations_t& agg_part_rels,
                         count[k]++;
             }
         }
-        std::cout << "<<<< ldof: " << i << " count array:";
-        for (int k=0; k<num_local_ldofs; ++k)
-        {
-            std::cout << " " << count[k];
-        }
-        std::cout << std::endl;
+
+        local_buffer << std::setw(13) << "ldof: "
+                     << std::setw(4) <<  i << " count array: ";
+        for (int j=0; j<num_local_ldofs; ++j)
+            local_buffer << count[j] << (j == num_local_ldofs-1 ? "\n" : " ");
 
         SA_ASSERT(rowsums[i] == count[i]);
 
@@ -670,7 +670,16 @@ int agg_construct_mises_local(agg_partitioning_relations_t& agg_part_rels,
     for (int i=0; i<num_total_rows; ++i)
        delete rows[i];
 
-    SA_PRINTF("%s","---agg_construct_mises_local finished---\n");
+    local_buffer << "CPU " << PROC_RANK << ": ---agg_construct_mises_local finished---\n";
+    for (int r=0; r<PROC_NUM; ++r)
+    {
+        if (r == PROC_RANK)
+        {
+            SA_PRINTF("%s", local_buffer.str().c_str());
+            fflush(stdout);
+        }
+        MPI_Barrier(MPI_COMM_WORLD);
+    }
     return num_true_rows;
 }
 
@@ -1141,7 +1150,7 @@ void agg_produce_mises(HypreParMatrix& Aglobal,
         bdr_dofs, do_aggregates, do_mises);
 
     if (do_mises)
-        SA_RPRINTF_L(0, 5, "Total number of MISes = %d\n",
+        SA_RPRINTF_NOTS_L(0, 5, "Total number of MISes = %d\n",
                      agg_part_rels.mis_truemis->GetGlobalNumRows());
 }
 
@@ -1712,7 +1721,8 @@ void agg_create_partitioning_tables(
     Transpose(*(agg_part_rels->AE_to_dof), *(agg_part_rels->dof_to_AE));
     agg_build_glob_to_AE_id_map(*agg_part_rels);
 
-    std::cout << "Inside agg_create_partitioning tables, and bool testmesh = " << agg_part_rels->testmesh << std::endl;
+    SA_RPRINTF_NOTS(0, "Inside agg_create_partitioning tables, and bool testmesh = %d\n",
+        agg_part_rels->testmesh);
 
     if (agg_part_rels->testmesh)
     {

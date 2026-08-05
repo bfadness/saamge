@@ -232,7 +232,7 @@ interp_data_t *interp_init_data(
     const agg_partitioning_relations_t& agg_part_rels, int nu_pro, 
     bool use_arpack, bool scaling_P)
 {
-    std::cout << "<<<< interp_init_data L231 interp.cpp" << std::endl;
+    SA_RPRINTF_NOTS(0, "%s", "<<<< interp_init_data L231 interp.cpp\n");
     const int nparts = agg_part_rels.nparts;
     interp_data_t *interp_data = new interp_data_t;
     SA_ASSERT(interp_data);
@@ -262,18 +262,15 @@ interp_data_t *interp_init_data(
 
     if (SA_IS_OUTPUT_LEVEL(5))
     {
-        SA_RPRINTF(0,"interp_smoother_degree: %d\n",
+        SA_RPRINTF_NOTS(0,"interp_smoother_degree: %d\n",
                    interp_data->interp_smoother_degree);
         PROC_STR_STREAM << "interp_smoother_roots: ";
         for (int i=0; i < interp_data->interp_smoother_degree; ++i)
             PROC_STR_STREAM << interp_data->interp_smoother_roots[i] << " ";
         PROC_STR_STREAM << "\n";
-        SA_RPRINTF(0,"%s", PROC_STR_STREAM.str().c_str());
+        SA_RPRINTF_NOTS(0,"%s", PROC_STR_STREAM.str().c_str());
         PROC_CLEAR_STR_STREAM;
-        SA_RPRINTF(0,"times_apply_smoother: %d\n",
-                   interp_data->times_apply_smoother);
     }
-
     return interp_data;
 }
 
@@ -381,7 +378,7 @@ void interp_compute_vectors(
     const Vector *xbad, bool transf, bool readapting,
     bool all_eigens, bool spect_update, bool bdr_cond_imposed, int fixed_num_evecs)
 {
-    std::cout << "<<<< interp_compute_vectors L376 interp.cpp" << std::endl;
+    SA_RPRINTF_NOTS(0, "%s", "<<<< interp_compute_vectors L376 interp.cpp\n");
     // const bool assemble_ess_diag = true;
     const int nparts = agg_part_rels.nparts;
 
@@ -409,7 +406,7 @@ void interp_compute_vectors(
     if (!transf || !readapting)
         spect_update = true;
 
-    SA_RPRINTF_L(0, 5, "theta: %g, tol: %g\n", theta, tol);
+    SA_RPRINTF_NOTS(0, "theta: %g, tol: %g\n", theta, tol);
 
     int arpack_size_threshold;
     if (interp_data.use_arpack)
@@ -423,7 +420,7 @@ void interp_compute_vectors(
     for (int i=0; i<nparts; ++i)
     {
         if (nparts < 10 || i % (nparts / 10) == 0)
-            SA_RPRINTF_L(0, 5, "  local eigenvalue problem %d / %d\n", i, nparts);
+            SA_RPRINTF_NOTS(0, "local eigenvalue problem %d/%d\n", i, nparts);
         bool local_added = false;
         const Matrix *AE_stiffm;
         Vector xbad_AE;
@@ -446,7 +443,7 @@ void interp_compute_vectors(
                 AEs_stiffm[i] = NULL;
             }
             SA_ASSERT(!AEs_stiffm[i]); // we demand to assemble these ourselves
-            std::cout << "<<<< Assemble AE " << i << " stiffness matrix L450" << std::endl;
+            SA_RPRINTF_NOTS(0, "<<<< Assemble AE %d stiffness matrix L450\n", i);
             AEs_stiffm[i] = elem_data->BuildAEStiff(i);
         }
         AE_stiffm = AEs_stiffm[i];
@@ -455,7 +452,7 @@ void interp_compute_vectors(
         //     !elem_data->IsGeometric())
              elem_data->IsGeometric())
         {
-            std::cout << "<<<< Save the AE " << i << " stiffness matrix in a file" << std::endl;
+            SA_RPRINTF_NOTS(0, "<<<< Save AE %d stiffness matrix to a file\n", i);
             std::stringstream filename;
             filename << "AE_stiffm_" << i << "." << PROC_RANK << ".mat";
             std::ofstream out(filename.str().c_str());
@@ -523,7 +520,8 @@ void interp_compute_vectors(
         } 
         else
         {
-            std::cout << "<<<< Allocate memory for the matrix of cut vectors L522" << std::endl;
+            SA_RPRINTF_NOTS(0, "%s",
+                "<<<< Allocate memory for the matrix of cut vectors L522\n");
             // Simply allocate memory for the matrix of cut vectors.
             // This is in case the hierarchy is being built from scratch.
             SA_ASSERT(!cut_evects_arr[i]);
@@ -540,8 +538,8 @@ void interp_compute_vectors(
 
         if (spect_update)
         {
-            std::cout << "<<<< Solve local eigenvalue problem L539" << std::endl;
             int agg_size = -1; // this only has any effect if we are doing the schur eigenproblem...
+            SA_RPRINTF_NOTS(0, "%s", "<<<< Solve local eigenvalue problem L539\n");
             if (agg_part_rels.mises_size != NULL)
                 agg_size = agg_part_rels.mises_size[i];
             local_added = eigensolver.Solve(
@@ -910,8 +908,8 @@ SparseMatrix *interp_sparse_tent_build(
     bool transf, bool readapting, bool all_eigens, bool spect_update,
     bool avoid_ess_bdr_dofs, int fixed_num_evecs, int svd_min_skip)
 {
-    std::cout << "<<<< interp_sparse_tent_build L899 interp.cpp" << std::endl;
-    SA_RPRINTF_L(0,4, "%s", "---------- interp_compute_vectors { --------------"
+    SA_RPRINTF_NOTS(0, "%s", "<<<< interp_sparse_tent_build L899 interp.cpp\n");
+    SA_RPRINTF_NOTS(0, "%s", "---------- interp_compute_vectors { --------------"
                  "-----\n");
 
     bool bdr_cond_imposed = avoid_ess_bdr_dofs;
@@ -932,7 +930,8 @@ SparseMatrix *interp_sparse_tent_build(
     tent_interp = interp_sparse_tent_assemble(agg_part_rels, interp_data,
                                               avoid_ess_bdr_dofs, svd_min_skip);
     {
-        std::cout << "<<<< Save the tentative interpolant sparse matrix in a file" << std::endl;
+        SA_RPRINTF_NOTS(0, "%s",
+            "<<<< Save the tentative interpolant sparse matrix in a file\n");
         std::stringstream filename;
         filename << "tent_interp." << PROC_RANK << ".mat";
         std::ofstream out(filename.str().c_str());

@@ -156,7 +156,7 @@ using std::size_t;
 #define SA_RPRINTF_NOTS(rank, ...) \
     do { \
         if (PROC_RANK == (rank)) \
-            SA_FPRINTF_NOTS(__VA_ARGS__); \
+            SA_PRINTF_NOTS(__VA_ARGS__); \
     } while(0)
 
 /*! \brief Prints to \em stdout without time stamp, depending on output level.

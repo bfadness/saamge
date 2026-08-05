@@ -193,8 +193,7 @@ int main(int argc, char *argv[])
         if (mesh->GetNV() == 20 && mesh->GetNE() == 12 && 
             times_refine == 0 && serial_times_refine == 0) // not very general...
             mltest = true;
-        if (0 == myid)
-            std::cout << "<<<< bool mltest = " << mltest << std::endl;
+        SA_RPRINTF_NOTS(0, "<<<< bool mltest = %d\n", mltest);
     }
     const int dim = mesh->Dimension();
     int nprocs = mpi.WorldSize();
@@ -207,7 +206,7 @@ int main(int argc, char *argv[])
             mesh->UniformRefinement();
         }
     }
-    SA_RPRINTF(0,"NV: %d, NE: %d\n", mesh->GetNV(), mesh->GetNE());
+    SA_RPRINTF_NOTS(0,"NV: %d, NE: %d\n", mesh->GetNV(), mesh->GetNE());
 
     int *proc_partitioning = nullptr;
     if (mltest && 4 == num_procs)
@@ -232,7 +231,7 @@ int main(int argc, char *argv[])
     const int pNE = pmesh.GetNE();
     const int pND = fes.GetNDofs();
     const int ND = fes.GlobalTrueVSize();
-    SA_RPRINTF(0,"pNV: %d, pNE: %d, pND: %d, ND: %d\n", pNV, pNE, pND, ND);
+    SA_RPRINTF_NOTS(0, "pNV: %d, pNE: %d, pND: %d, ND: %d\n", pNV, pNE, pND, ND);
 
     std::ostringstream mesh_name;
     mesh_name << "mesh." << std::setfill('0') << std::setw(6) << myid;
@@ -291,8 +290,7 @@ int main(int argc, char *argv[])
     x.Distribute(true_x);
 
     double error = x.ComputeL2Error(sol);
-    if (0 == myid)
-        std::cout << "<<<< |u_h - u|_2 = " << error << std::endl;
+    SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %f\n", error);
 
     std::ostringstream sol_name;
     sol_name << "sol." << std::setfill('0') << std::setw(6) << myid;
