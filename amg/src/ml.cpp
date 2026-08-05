@@ -438,9 +438,9 @@ ml_data_t * ml_produce_data(
     }
     else
     {
-        tg_build_hierarchy(Ag, *tg_data, *agg_part_rels,
-                           elem_data_finest, mlp.get_avoid_ess_bdr_dofs(), mlp.get_fixed_num_evecs(0), mlp.get_svd_min_skip());
         SA_RPRINTF_NOTS(0, "%s", "<<<< else statement L445 ml.cpp\n");
+        tg_build_hierarchy(Ag, *tg_data, *agg_part_rels, elem_data_finest,
+            mlp.get_avoid_ess_bdr_dofs(), mlp.get_fixed_num_evecs(0), mlp.get_svd_min_skip());
     }
 
     if (agg_part_rels->testmesh)
