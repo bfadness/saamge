@@ -234,9 +234,8 @@ interp_data_t *interp_init_data(
 {
     SA_RPRINTF_NOTS(0, "%s", "<<<< interp_init_data L231 interp.cpp\n");
     const int nparts = agg_part_rels.nparts;
-    interp_data_t *interp_data = new interp_data_t;
+    interp_data_t *interp_data = new interp_data_t{};
     SA_ASSERT(interp_data);
-    memset(interp_data, 0, sizeof(*interp_data));
 
     interp_data->nparts = nparts;
     SA_ASSERT(0 < interp_data->nparts);
