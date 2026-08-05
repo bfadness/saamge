@@ -108,6 +108,7 @@ MultilevelParameters::~MultilevelParameters()
     delete [] nu_pro;
     delete [] nu_relax;
     delete [] theta;
+    delete [] fixed_num_evecs;
     delete [] polynomial_coarse_space;
 }
 
