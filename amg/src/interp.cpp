@@ -538,14 +538,14 @@ void interp_compute_vectors(
 
         if (spect_update)
         {
-            int agg_size = -1; // this only has any effect if we are doing the schur eigenproblem...
             SA_RPRINTF_NOTS(0, "%s", "<<<< Solve local eigenvalue problem L539\n");
+            int agg_size = -1; // this only has any effect
+                               // if we are doing the schur eigenproblem...
             if (agg_part_rels.mises_size != NULL)
                 agg_size = agg_part_rels.mises_size[i];
             local_added = eigensolver.Solve(
                 *AE_stiffm, rhs_matrices_arr[i], i, i,
-                agg_size,
-                theta_local, *(cut_evects_arr[i]), fixed_num_evecs);
+                agg_size, theta_local, *(cut_evects_arr[i]), fixed_num_evecs);
 
 #if 0
             const double lower_bound = 1e-4;

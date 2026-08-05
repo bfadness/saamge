@@ -180,7 +180,7 @@ int main(int argc, char *argv[])
     SA_ASSERT(!(correct_nulspace && minimal_coarse));
 
     MPI_Barrier(active_comm); // try to make MFEM's debug element orientation prints
-                            // not mess up the parameters above
+                              // not mess up the parameters above
     bool mltest = false;
     Mesh *mesh;
     if (generate_mesh > 0)
@@ -190,8 +190,8 @@ int main(int argc, char *argv[])
     else
     {
         mesh = fem_read_mesh(mesh_file);
-        if (mesh->GetNV() == 20 && mesh->GetNE() == 12 && 
-            times_refine == 0 && serial_times_refine == 0) // not very general...
+        if (20 == mesh->GetNV() && 12 == mesh->GetNE() &&
+            0 == times_refine && 2 == num_levels) // not very general...
             mltest = true;
         SA_RPRINTF_NOTS(0, "<<<< bool mltest = %d\n", mltest);
     }
@@ -220,9 +220,7 @@ int main(int argc, char *argv[])
     delete []proc_partitioning;
 
     for (int i=0; i<times_refine; ++i)
-    {
         pmesh.UniformRefinement();
-    }
 
     H1_FECollection fec(order, dim);
     ParFiniteElementSpace fes(&pmesh, &fec);

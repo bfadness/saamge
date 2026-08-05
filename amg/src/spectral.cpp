@@ -153,8 +153,8 @@ bool Eigensolver::SolveDirect(
 
     SA_ASSERT(SA_REAL_ALMOST_LE(theta, lmax));
     SA_ASSERT(theta >= 0.);
-    SA_ASSERT(fixed_num <= 0 || !all_eigens); // Not a meaningful parameter combination in the current implementation.
-
+    SA_ASSERT(fixed_num <= 0 || !all_eigens); // Not a meaningful parameter
+                                              // combination in the current implementation.
     if (transf)
     {
         // Transform the matrices for the eigenproblem.
