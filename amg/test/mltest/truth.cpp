@@ -1,5 +1,6 @@
 #include <mfem.hpp>
 #include <mpi.h>
+#include <memory>
 #include "saamge.hpp"
 
 using namespace mfem;
@@ -28,54 +29,64 @@ double bdr_cond(Vector &x)
 
 /**
    do the agglomerate partitioning for mltest mesh
-   this partitions elements into agglomerates
+   this partitions elements into four agglomerates
    this only makes sense for the first coarsening
 */
 agg_partitioning_relations_t *
 fem_create_test_partitioning(HypreParMatrix &A, ParFiniteElementSpace &fes,
                              const agg_dof_status_t *bdr_dofs, int *nparts,
-                             bool do_aggregates)
+                             bool do_aggregates,
+                             std::vector<int> &element_agglomerate)
 {
-    Table *elem_to_dof, *elem_to_elem;
     Mesh *mesh = fes.GetMesh();
 
-    //XXX: This will stay allocated in MESH till the end.
-    elem_to_elem = mbox_copy_table(&(mesh->ElementToElementTable()));
+    // the following two tables stay allocated until the end of main
+    Table *elem_to_elem = mbox_copy_table(&(mesh->ElementToElementTable()));
+    Table *elem_to_dof = mbox_copy_table(&(fes.GetElementToDofTable()));
 
-    //XXX: This remains allocated in FES till the end.
-    elem_to_dof = mbox_copy_table(&(fes.GetElementToDofTable()));
+    // indices below are all local and not global
+    if (1 == PROC_NUM)
+        element_agglomerate = {0, 0, 1, 1, 0, 0, 2, 2, 3, 3, 3, 2};
+    else if (2 == PROC_NUM && 0 == PROC_RANK)
+        element_agglomerate = {0, 0, 1, 1, 0, 0};
+    else if (2 == PROC_NUM && 1 == PROC_RANK)
+        element_agglomerate = {0, 0, 1, 1, 1, 0};
+    else if (4 == PROC_NUM)
+    {
+        // the nested ternary operators here suck,
+        // but they reduce eyes glazing over
+        int num_elem = (0 == PROC_RANK) ? 4 : (1 == PROC_RANK) ? 2 : 3;
+        element_agglomerate.assign(num_elem, 0);
+    }
+    else
+        SA_ASSERT(false);
 
-    int *partitioning = NULL;
-    partitioning = new int[12];
-    partitioning[0] = partitioning[1] = partitioning[4] = partitioning[5] = 0;
-    partitioning[2] = partitioning[3] = 1;
-    partitioning[6] = partitioning[7] = partitioning[11] = 2;
-    partitioning[8] = partitioning[9] = partitioning[10] = 3;
-
-    std::cout << "partitioning_array:";
-    for (int i=0; i<12; ++i)
-        std::cout << " " << partitioning[i];
-    std::cout << std::endl;
-
-    // in what follows, bdr_dofs is only used as info to copy onto coarser level, 
-    // does not actually affect partitioning
+    // bdr_dofs is only used as info to copy onto coarser level
+    // it does not actually affect partitioning
     agg_partitioning_relations_t *agg_part_rels =
         agg_create_partitioning_fine(A, fes.GetNE(), elem_to_dof, elem_to_elem,
-                                     partitioning, bdr_dofs, nparts, 
+                                     element_agglomerate.data(), bdr_dofs, nparts,
                                      fes.Dof_TrueDof_Matrix(), do_aggregates, true);
-
     SA_ASSERT(agg_part_rels);
     return agg_part_rels;
 }
 
-int *fem_partition_test_mesh(Mesh &mesh)
+// Create the element to process index array for the serial mesh
+std::vector<int> fem_partition_test_mesh(Mesh &mesh)
 {
-    int *out = new int[mesh.GetNE()];
-    out[0] = out[1] = out[4] = out[5] = 0;
-    out[2] = out[3] = 1;
-    out[6] = out[7] = out[11] = 2;
-    out[8] = out[9] = out[10] = 3;
-    return out;
+    SA_RPRINTF_NOTS(0, "Using the test mesh with %d processes\n", PROC_NUM);
+    const int num_elements = mesh.GetNE();
+    std::vector<int> element_process;
+    element_process.reserve(num_elements);
+    if (1 == PROC_NUM)
+        std::fill(element_process.begin(), element_process.end(), 0);
+    else if (4 == PROC_NUM)
+        element_process = {0, 0, 1, 1, 0, 0, 2, 2, 3, 3, 3, 2};
+    else if (2 == PROC_NUM)
+        element_process = {0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1};
+    else
+        SA_ASSERT(false);
+    return element_process;
 }
 
 int main(int argc, char *argv[])
@@ -208,16 +219,20 @@ int main(int argc, char *argv[])
     }
     SA_RPRINTF_NOTS(0,"NV: %d, NE: %d\n", mesh->GetNV(), mesh->GetNE());
 
-    int *proc_partitioning = nullptr;
-    if (mltest && 4 == num_procs)
+    std::vector<int> proc_partitioning;
+    int *raw_ptr = nullptr;
+    if (mltest)
         proc_partitioning = fem_partition_test_mesh(*mesh);
     else
-        proc_partitioning = fem_partition_mesh(*mesh, &nprocs);
+    {
+        raw_ptr = fem_partition_mesh(*mesh, &nprocs);
+        proc_partitioning.assign(raw_ptr, raw_ptr + mesh->GetNE());
+    }
     if (0 == myid && visualize)
-        fem_serial_visualize_partitioning(*mesh, proc_partitioning);
-    ParMesh pmesh(active_comm, *mesh, proc_partitioning);
+        fem_serial_visualize_partitioning(*mesh, proc_partitioning.data());
+    ParMesh pmesh(active_comm, *mesh, proc_partitioning.data());
+    delete []raw_ptr;
     delete mesh;
-    delete []proc_partitioning;
 
     for (int i=0; i<times_refine; ++i)
         pmesh.UniformRefinement();
