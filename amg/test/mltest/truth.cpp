@@ -271,7 +271,7 @@ int main(int argc, char *argv[])
     Array<int> ess_bdr(pmesh.bdr_attributes.Max());
     ess_bdr = 1;
     const bool keep_diag = true;
-    a.EliminateEssentialBC(ess_bdr, x, b);
+    a.EliminateEssentialBC(ess_bdr, x, b, keep_diag);
     a.Finalize();
 
 /*
@@ -288,14 +288,14 @@ int main(int argc, char *argv[])
     Vector true_rhs(true_x.Size());
 
     b.ParallelAssemble(true_rhs);
-    HypreParMatrix A = *a.ParallelAssemble();
+    std::unique_ptr<HypreParMatrix> A(a.ParallelAssemble());
 
-    HypreBoomerAMG amg(A);
+    HypreBoomerAMG amg(*A);
     amg.SetPrintLevel(0);
 
     CGSolver pcg(active_comm);
     pcg.SetPreconditioner(amg);
-    pcg.SetOperator(A);
+    pcg.SetOperator(*A);
     pcg.SetRelTol(1e-6); // for some reason MFEM squares this...
     pcg.SetMaxIter(1000);
     pcg.SetPrintLevel(2);
