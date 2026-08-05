@@ -97,9 +97,6 @@ int main(int argc, char *argv[])
     MPI_Comm active_comm = MPI_COMM_WORLD;
     proc_init(active_comm);
 
-    agg_partitioning_relations_t *agg_part_rels;
-    ml_data_t *ml_data;
-
     OptionsParser args(argc, argv);
     const char *mesh_file = "/Users/bfadness/src/forks/saamge/amg/test/mltest.mesh";
     bool visualize = true;
@@ -228,8 +225,6 @@ int main(int argc, char *argv[])
         raw_ptr = fem_partition_mesh(*mesh, &nprocs);
         proc_partitioning.assign(raw_ptr, raw_ptr + mesh->GetNE());
     }
-    if (0 == myid && visualize)
-        fem_serial_visualize_partitioning(*mesh, proc_partitioning.data());
     ParMesh pmesh(active_comm, *mesh, proc_partitioning.data());
     delete []raw_ptr;
     delete mesh;
@@ -301,6 +296,8 @@ int main(int argc, char *argv[])
     pcg.SetPrintLevel(2);
     pcg.Mult(true_rhs, true_x);
     x.Distribute(true_x);
+    if (visualize)
+        fem_parallel_visualize_gf(pmesh, x);
 
     double error = x.ComputeL2Error(sol);
     SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %f\n", error);
@@ -310,6 +307,56 @@ int main(int argc, char *argv[])
     std::ofstream sol_ofs(sol_name.str().c_str());
     sol_ofs.precision(8);
     x.Save(sol_ofs);
+
+    // AMGe code begins here
+    std::vector<int> element_agglomerate;
+    int *nparts_arr = new int[num_levels-1];
+    const bool do_aggregates_here = do_aggregates && (num_levels == 2);
+    agg_dof_status_t *bdr_dofs = fem_find_bdr_dofs(fes, &ess_bdr);
+    agg_partitioning_relations_t *agg_part_rels;
+    if (mltest)
+    {
+        nparts_arr[0] = 4/PROC_NUM;
+        SA_RPRINTF_NOTS(0, "%s", "Get the agglomerate test mesh partition relations\n");
+        agg_part_rels = fem_create_test_partitioning(
+            *A, fes, bdr_dofs, nparts_arr,
+            do_aggregates_here, element_agglomerate);
+    }
+    else
+    {
+        nparts_arr[0] = std::max(1, pNE / first_elems_per_agg);
+        for (int i=1; i<num_levels-1; ++i)
+            nparts_arr[i] = std::lround(
+                static_cast<double>(nparts_arr[i-1]) / elems_per_agg);
+        SA_RPRINTF_NOTS(0, "%s", "Get the agglomerate mesh partition relations\n");
+        agg_part_rels = fem_create_partitioning(
+            *A, fes, bdr_dofs, nparts_arr, do_aggregates_here);
+    }
+    delete []bdr_dofs;
+
+    if (visualize)
+    {
+        fem_parallel_visualize_partitioning(
+            pmesh, agg_part_rels->partitioning, nparts_arr[0]);
+    }
+    ElementMatrixProvider *emp(
+        new ElementMatrixStandardGeometric(*agg_part_rels, a.SpMat(), &a));
+    int polynomial_coarse(minimal_coarse ? 0 : -1);
+    MultilevelParameters mlp(
+        num_levels-1, nparts_arr, first_nu_pro, nu_pro, nu_relax,
+        first_theta, theta, polynomial_coarse, correct_nulspace,
+        !direct_eigensolver, do_aggregates);
+    mlp.set_use_double_cycle(double_cycle);
+    mlp.set_coarse_direct(coarse_direct);
+    if (linear_coarse)
+        mlp.set_polynomial_coarse_space(0, 1);
+
+    ml_data_t *ml_data(ml_produce_data(*A, agg_part_rels, emp, mlp));
+
+    ml_free_data(ml_data);
+    agg_part_rels->partitioning = nullptr; // prevent double free of element_agglomerate
+    agg_free_partitioning(agg_part_rels);
+    delete []nparts_arr;
 
     return 0;
 }
