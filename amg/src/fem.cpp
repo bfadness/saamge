@@ -203,7 +203,7 @@ void fem_parallel_visualize_gf(const ParMesh& mesh, ParGridFunction& x,
     sol_sock.precision(CONFIG_ACCESS_OPTION(GLOBAL, prec));
     mesh.Print(sol_sock);
     x.Save(sol_sock);
-    sol_sock << keys;
+    sol_sock << "Rjl" << keys;
     // sol_sock.send();
     sol_sock.close();
 }
@@ -271,7 +271,6 @@ void fem_serial_visualize_partitioning(Mesh& mesh, int *partitioning,
     SA_PRINTF_L(4, "%s", "Visualizing partition in serial...\n");
     char vishost[] = "localhost";
     int visport = GLVIS_PORT;
-    // osockstream sol_sock(visport, vishost);
     socketstream sol_sock(vishost, visport);
 
     if (!sol_sock.is_open())
@@ -290,15 +289,12 @@ void fem_serial_visualize_partitioning(Mesh& mesh, int *partitioning,
     {
         p(i) = (double)partitioning[i];
     }
-    if (2 == mesh.Dimension())
-        sol_sock << "fem2d_gf_data_keys\n";
-    else
-        sol_sock << "fem3d_gf_data_keys\n";
+    sol_sock << "solution\n";
     sol_sock.precision(CONFIG_ACCESS_OPTION(GLOBAL, prec));
     mesh.PrintWithPartitioning(partitioning, sol_sock, true);
     p.Save(sol_sock);
-    sol_sock << (2 == mesh.Dimension()?"Rjl":"") << keys;
-    // sol_sock.send();
+    if (0 == PROC_RANK)
+        sol_sock << "keys " << (2 == mesh.Dimension() ? "Rjl" : "") << keys << "\n";
     sol_sock.close();
     delete pfes;
     delete pfec;
@@ -310,7 +306,6 @@ void fem_parallel_visualize_partitioning(ParMesh& mesh, int *partitioning,
     // SA_PRINTF_L(4, "%s", "Visualizing partition in parallel...\n");
     char vishost[] = "localhost";
     int visport = GLVIS_PORT;
-    // osockstream sol_sock(visport, vishost);
     socketstream sol_sock(vishost, visport);
 
     if (!sol_sock.is_open())
@@ -328,8 +323,6 @@ void fem_parallel_visualize_partitioning(ParMesh& mesh, int *partitioning,
     const int NE = mesh.GetNE();
     int *lpartitioning = new int[NE];
     Array<int> offsets;
-    // proc_allgather_offsets(parts, offsets);
-    // SA_ASSERT(offsets[PROC_RANK] >= 0);
     int total;
     proc_determine_offsets(parts, offsets, total);
     SA_ASSERT(offsets[0] >= 0);
@@ -344,15 +337,12 @@ void fem_parallel_visualize_partitioning(ParMesh& mesh, int *partitioning,
     if (PROC_NUM > 1)
         sol_sock << "parallel " << PROC_NUM << " " << PROC_RANK << std::endl;
 
-    if (2 == mesh.Dimension())
-        sol_sock << "fem2d_gf_data_keys\n";
-    else
-        sol_sock << "fem3d_gf_data_keys\n";
+    sol_sock << "solution\n";
     sol_sock.precision(CONFIG_ACCESS_OPTION(GLOBAL, prec));
     mesh.PrintWithPartitioning(lpartitioning, sol_sock, true);
     p.Save(sol_sock);
-    sol_sock << "f" << (2 == mesh.Dimension()?"Rjl":"") << keys;
-    // sol_sock.send();
+    if (0 == PROC_RANK)
+        sol_sock << "keys " << (2 == mesh.Dimension() ? "Rjl" : "") << keys << "\n";
     sol_sock.close();
     delete [] lpartitioning;
     delete pfes;
