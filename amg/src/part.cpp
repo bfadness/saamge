@@ -164,8 +164,9 @@ int *part_generate_partitioning(const Table& graph, int *weights, int *parts,
         // Enforce, just in case, C-style indices.
         options[METIS_OPTION_NUMBERING] = 0;
         // Require connected partitions.
-        options[METIS_OPTION_CONTIG] = true;
+        options[METIS_OPTION_CONTIG] = 1;
         options[METIS_OPTION_UFACTOR] = 30;
+        options[METIS_OPTION_SEED] = 42;
 
         // Perform the partitioning.
         stat = METIS_PartGraphKway(&nodes_number,
@@ -196,6 +197,7 @@ int *part_generate_partitioning(const Table& graph, int *weights, int *parts,
     // part_check_partitioning(graph, partitioning);
     actual_parts = p_array.Max() + 1;
     *parts = actual_parts;
+    SA_ASSERT(target_parts == actual_parts);
 
     // Compute the number of non-empty partitions.
     SA_RPRINTF_L(0, 3, "Desired number of partitions: %d\n", target_parts);
