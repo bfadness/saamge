@@ -139,8 +139,6 @@ int *part_generate_partitioning(const Table& graph, int *weights, int *parts,
     int actual_parts;
     SA_ASSERT(target_parts > 0);
 
-    SA_RPRINTF_L(0, 4, "%s", "Partitioning graph...\n");
-
     if (target_parts > 1)
     {
 #ifndef MFEM_USE_METIS_5
@@ -200,8 +198,8 @@ int *part_generate_partitioning(const Table& graph, int *weights, int *parts,
     SA_ASSERT(target_parts == actual_parts);
 
     // Compute the number of non-empty partitions.
-    SA_RPRINTF_L(0, 3, "Desired number of partitions: %d\n", target_parts);
-    SA_RPRINTF_L(0, 3, "Actual number of partitions: %d\n", actual_parts);
+    // SA_RPRINTF_L(0, 3, "Desired number of partitions: %d\n", target_parts);
+    // SA_RPRINTF_L(0, 3, "Actual number of partitions: %d\n", actual_parts);
 
     return partitioning;
 }

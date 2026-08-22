@@ -696,14 +696,13 @@ static inline
 mfem::HypreParMatrix *tg_coarse_matr(mfem::HypreParMatrix& A,
                                      mfem::HypreParMatrix& interp)
 {
-    SA_RPRINTF_L(0, 5, "%s", "Computing coarse operator...\n");
     mfem::HypreParMatrix *Ac = RAP(&A, &interp);
     SA_ASSERT(Ac);
     SA_ASSERT(Ac->GetGlobalNumRows() == Ac->GetGlobalNumCols());
     SA_ASSERT(Ac->GetGlobalNumRows() == interp.GetGlobalNumCols());
 
-    SA_RPRINTF_L(0, 3, "Ac nnz: %d, A nnz: %d, OC: %g\n", Ac->NNZ(),
-                A.NNZ(), ((double)Ac->NNZ()) / ((double)A.NNZ()) + 1.);
+    SA_RPRINTF_NOTS_L(0, 3, "            operator complexity: 1 + %d/%d = %g\n",
+        Ac->NNZ(), A.NNZ(), ((double)Ac->NNZ()) / ((double)A.NNZ()) + 1.);
 
     return Ac;
 }
