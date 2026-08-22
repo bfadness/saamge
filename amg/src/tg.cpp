@@ -216,6 +216,7 @@ int tg_solve(HypreParMatrix& A, HypreParVector& b, HypreParVector& x,
              tg_recalc_res_ft recalc_res, tg_data_t *tg_data, double rtol,
              double atol, double reducttol, bool output/*=true*/)
 {
+    SA_RPRINTF_NOTS_L(0, 4, "%s", "    --> tg_solve\n");
     HypreParVector *res = nullptr, *psres = nullptr;
 
     SA_ASSERT(A.GetGlobalNumRows() == A.GetGlobalNumCols());
@@ -234,7 +235,7 @@ int tg_solve(HypreParMatrix& A, HypreParVector& b, HypreParVector& x,
     double end = std::max(rr*rtol*rtol, atol * atol);
     SA_ASSERT(end >= 0.0);
     if (output)
-        SA_RPRINTF_L(0,2, "Stationary iteration end tolerance: %g\n", end);
+        SA_RPRINTF_NOTS_L(0, 2, "        end tolerance: %12.5e\n", end);
 
     int i;
     double rr_prev, reduction;
@@ -287,10 +288,10 @@ int tg_run(HypreParMatrix& A,
            double atol, double reducttol, tg_data_t *tg_data, bool zero_rhs,
            bool output/*=true*/)
 {
+    if (output)
+        SA_RPRINTF_NOTS_L(0, 4, "%s", "--> tg_run\n");
 
     SA_ASSERT(tg_data);
-    if (output)
-        SA_RPRINTF_L(0,4, "%s", "---------- tg_solve { -----------------------\n");
     tg_fillin_coarse_operator(A, tg_data, true);
 
     int tgiters = 0;
@@ -364,7 +365,7 @@ tg_data_t *tg_init_data(
     int nu_pro, int nu_relax, double theta, bool smooth_interp, 
     double smooth_drop_tol, bool use_arpack)
 {
-    SA_RPRINTF_NOTS(0, "%s", "<<<< tg_init_data L402 tg.cpp\n");
+    SA_RPRINTF_NOTS(0, "%s", "--> tg_init_data\n");
     tg_data_t *tg_data = new tg_data_t;
     SA_ASSERT(tg_data);
     memset(tg_data, 0, sizeof(*tg_data));
@@ -395,13 +396,14 @@ void tg_assemble_and_smooth(HypreParMatrix &Ag,
                             tg_data_t& tg_data,
                             const agg_partitioning_relations_t& agg_part_rels)
 {
+    SA_RPRINTF_NOTS(0, "%s", "    --> tg_assemble_and_smooth\n");
     StopWatch chrono;
     chrono.Start();
     tg_data.tent_interp =
         interp_global_tent_assemble(agg_part_rels, *tg_data.interp_data,
                                     tg_data.ltent_interp);
     chrono.Stop();
-    SA_RPRINTF_L(0, 5, "Time for global_tent_assemble: %f\n",chrono.RealTime());
+    SA_RPRINTF_L(0, 9, "Time for global_tent_assemble: %f\n",chrono.RealTime());
 
     if (tg_data.interp_data->scaling_P)
     {
@@ -419,8 +421,8 @@ void tg_assemble_and_smooth(HypreParMatrix &Ag,
     chrono.Start();
     tg_smooth_interp(Ag, tg_data);
     chrono.Stop();
-    SA_RPRINTF_L(0, 5, "Time for tg_smooth_interp: %f\n",chrono.RealTime());
-    if (SA_IS_OUTPUT_LEVEL(3))
+    SA_RPRINTF_L(0, 9, "Time for tg_smooth_interp: %f\n",chrono.RealTime());
+    if (SA_IS_OUTPUT_LEVEL(9))
     {
         SA_RPRINTF(0,"fine DoFs: %d\n", agg_part_rels.ND);
         SA_RPRINTF(0,"interp: %d x %d\n", tg_data.interp->GetGlobalNumRows(),
@@ -432,6 +434,13 @@ void tg_assemble_and_smooth(HypreParMatrix &Ag,
     }
     SA_ASSERT(tg_data.interp->GetGlobalNumCols() ==
               tg_data.restr->GetGlobalNumRows());
+
+    const int num_fine_dofs = agg_part_rels.ND;
+    const int num_coarse_dofs = tg_data.interp->GetGlobalNumCols();
+    SA_RPRINTF_NOTS(0, "            coarse space dimension: %d\n", num_coarse_dofs);
+    const double grid_complexity = (num_fine_dofs + num_coarse_dofs) / (double)num_fine_dofs;
+    SA_RPRINTF_NOTS(0, "            grid complexity: 1 + %d/%d = %g\n",
+        num_coarse_dofs, num_fine_dofs, grid_complexity);
 }
 
 void tg_build_hierarchy_with_polynomial(
@@ -466,7 +475,7 @@ void tg_build_hierarchy(HypreParMatrix& Ag, tg_data_t& tg_data,
                         ElementMatrixProvider *elem_data,
                         bool avoid_ess_bdr_dofs, int fixed_num_evecs, int svd_min_skip)
 {
-    SA_RPRINTF_NOTS(0, "%s", "<<<< tg_build_hierarchy L503 tg.cpp\n");
+    SA_RPRINTF_NOTS(0, "%s", "--> tg_build_hierarchy\n");
     double useless_parameter = 0.; // Essentially, not used.
 
     //XXX: Currently, we see no reason to actually compute all eigenpairs.
@@ -943,13 +952,14 @@ double tg_compute_OC(HypreParMatrix& A, tg_data_t& tg_data)
 void tg_update_coarse_operator(mfem::HypreParMatrix& A, tg_data_t *tg_data,
                                bool perform_solve_init, bool coarse_direct)
 {
+    SA_RPRINTF_NOTS(0, "%s", "--> tg_update_coarse_operator\n");
     SA_ASSERT(tg_data);
     SA_ASSERT(tg_data->interp);
     SA_ASSERT(tg_data->restr);
 
     tg_free_coarse_operator(*tg_data);
 
-    std::cout << "<<<< tg_coarse_matr L992 tg.cpp" << std::endl;
+    SA_RPRINTF_NOTS(0, "%s", "    --> tg_coarse_matr\n");
     tg_data->Ac = tg_coarse_matr(A, *(tg_data->interp));
     if (perform_solve_init)
     {
@@ -957,19 +967,19 @@ void tg_update_coarse_operator(mfem::HypreParMatrix& A, tg_data_t *tg_data,
         {
             if (PROC_NUM == 1)
             {
-                SA_RPRINTF_L(0, 5, "%s",
+                SA_RPRINTF_L(0, 9, "%s",
                              "Setting coarse solver as direct UMFPACK solver.\n");
                 tg_data->coarse_solver = new HypreDirect(*tg_data->Ac);
             } else
             {
-                SA_RPRINTF_L(0, 5, "%s", "Setting coarse solver as a CG preconditioned "
+                SA_RPRINTF_L(0, 9, "%s", "Setting coarse solver as a CG preconditioned "
                                          "with BoomerAMG.\n");
                 tg_data->coarse_solver = new AMGSolver(*tg_data->Ac, false, 1e-16, 10);
             }
         }
         else
         {
-            SA_RPRINTF_L(0, 5, "%s",
+            SA_RPRINTF_L(0, 9, "%s",
                        "Setting coarse solver as a single BoomerAMG v-cycle.\n");
             mfem::HypreBoomerAMG * hbamg = new mfem::HypreBoomerAMG(*tg_data->Ac);
             hbamg->SetPrintLevel(0);

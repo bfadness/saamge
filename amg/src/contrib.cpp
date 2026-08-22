@@ -89,7 +89,9 @@ SparseMatrix * ContribTent::contrib_tent_finalize()
     // SA_ASSERT(tent_int_struct->filled_cols > 0);
     SA_ASSERT(filled_cols >= 0);
     if (filled_cols == 0)
-        SA_PRINTF("%s","WARNING! no coarse degrees of freedom on this processor.\n");
+        SA_PRINTF_NOTS(
+            "            CPU %d: warning: process contains no degrees of freedom\n",
+            PROC_RANK);
     tent_interp_->Finalize();
 
     if (tent_interp_->Width() == filled_cols)

@@ -232,7 +232,7 @@ interp_data_t *interp_init_data(
     const agg_partitioning_relations_t& agg_part_rels, int nu_pro, 
     bool use_arpack, bool scaling_P)
 {
-    SA_RPRINTF_NOTS(0, "%s", "<<<< interp_init_data L231 interp.cpp\n");
+    SA_RPRINTF_NOTS(0, "%s", "    --> interp_init_data\n");
     const int nparts = agg_part_rels.nparts;
     interp_data_t *interp_data = new interp_data_t{};
     SA_ASSERT(interp_data);
@@ -261,14 +261,17 @@ interp_data_t *interp_init_data(
 
     if (SA_IS_OUTPUT_LEVEL(5))
     {
-        SA_RPRINTF_NOTS(0,"interp_smoother_degree: %d\n",
+        SA_RPRINTF_NOTS(0,"        interp_smoother_degree: %d\n",
                    interp_data->interp_smoother_degree);
-        PROC_STR_STREAM << "interp_smoother_roots: ";
-        for (int i=0; i < interp_data->interp_smoother_degree; ++i)
-            PROC_STR_STREAM << interp_data->interp_smoother_roots[i] << " ";
-        PROC_STR_STREAM << "\n";
-        SA_RPRINTF_NOTS(0,"%s", PROC_STR_STREAM.str().c_str());
-        PROC_CLEAR_STR_STREAM;
+        if (interp_data->interp_smoother_degree > 0)
+        {
+            PROC_STR_STREAM << "        interp_smoother_roots: ";
+            for (int i=0; i < interp_data->interp_smoother_degree; ++i)
+                PROC_STR_STREAM << interp_data->interp_smoother_roots[i] << " ";
+            PROC_STR_STREAM << "\n";
+            SA_RPRINTF_NOTS(0,"%s", PROC_STR_STREAM.str().c_str());
+            PROC_CLEAR_STR_STREAM;
+        }
     }
     return interp_data;
 }
@@ -377,7 +380,7 @@ void interp_compute_vectors(
     const Vector *xbad, bool transf, bool readapting,
     bool all_eigens, bool spect_update, bool bdr_cond_imposed, int fixed_num_evecs)
 {
-    SA_RPRINTF_NOTS(0, "%s", "<<<< interp_compute_vectors L376 interp.cpp\n");
+    SA_RPRINTF_NOTS(0, "%s", "        --> interp_compute_vectors\n");
     // const bool assemble_ess_diag = true;
     const int nparts = agg_part_rels.nparts;
 
@@ -433,7 +436,6 @@ void interp_compute_vectors(
         if (!readapting)
         {
             // Build agglomerate stiffness matrix.
-            SA_PRINTF_L(9, "%s", "Assembling local stiffness matrix...\n");
             SA_ASSERT(elem_data);
             if (transf)
             {
@@ -442,16 +444,13 @@ void interp_compute_vectors(
                 AEs_stiffm[i] = NULL;
             }
             SA_ASSERT(!AEs_stiffm[i]); // we demand to assemble these ourselves
-            SA_RPRINTF_NOTS(0, "<<<< Assemble AE %d stiffness matrix L450\n", i);
             AEs_stiffm[i] = elem_data->BuildAEStiff(i);
         }
         AE_stiffm = AEs_stiffm[i];
         SA_ASSERT(AE_stiffm);
         if (agg_part_rels.testmesh &&
-        //     !elem_data->IsGeometric())
-             elem_data->IsGeometric())
+            !elem_data->IsGeometric())
         {
-            SA_RPRINTF_NOTS(0, "<<<< Save AE %d stiffness matrix to a file\n", i);
             std::stringstream filename;
             filename << "AE_stiffm_" << i << "." << PROC_RANK << ".mat";
             std::ofstream out(filename.str().c_str());
@@ -519,8 +518,6 @@ void interp_compute_vectors(
         } 
         else
         {
-            SA_RPRINTF_NOTS(0, "%s",
-                "<<<< Allocate memory for the matrix of cut vectors L522\n");
             // Simply allocate memory for the matrix of cut vectors.
             // This is in case the hierarchy is being built from scratch.
             SA_ASSERT(!cut_evects_arr[i]);
@@ -645,7 +642,7 @@ void interp_compute_vectors(
     // Suggest a new theta.
     if (spect_update)
     {
-        if (SA_IS_OUTPUT_LEVEL(5))
+        if (SA_IS_OUTPUT_LEVEL(9))
         {
             SA_RPRINTF(0,"Vectors skipped on %d agglomerates.\n", skipctr);
             SA_RPRINTF(0,"Average skipped over all agglomerates: %g\n",
@@ -660,10 +657,10 @@ void interp_compute_vectors(
         // Compute a weighted average of the old theta and a proposal.
         if (skipctr > 0)
             theta = (1. - eta) * theta + eta * thetap;
-        SA_RPRINTF_L(0, 5, "Suggested theta: %g\n", theta);
+        SA_RPRINTF_L(0, 9, "Suggested theta: %g\n", theta);
     }
 
-    if (SA_IS_OUTPUT_LEVEL(5))
+    if (SA_IS_OUTPUT_LEVEL(9))
         eigensolver.PrintStatistics();
 }
 
@@ -906,9 +903,7 @@ SparseMatrix *interp_sparse_tent_build(
     bool transf, bool readapting, bool all_eigens, bool spect_update,
     bool avoid_ess_bdr_dofs, int fixed_num_evecs, int svd_min_skip)
 {
-    SA_RPRINTF_NOTS(0, "%s", "<<<< interp_sparse_tent_build L899 interp.cpp\n");
-    SA_RPRINTF_NOTS(0, "%s", "---------- interp_compute_vectors { --------------"
-                 "-----\n");
+    SA_RPRINTF_NOTS(0, "%s", "    --> interp_sparse_tent_build\n");
 
     bool bdr_cond_imposed = avoid_ess_bdr_dofs;
     interp_compute_vectors(
@@ -918,26 +913,19 @@ SparseMatrix *interp_sparse_tent_build(
 
     if (SA_IS_OUTPUT_LEVEL(4))
     {
-        SA_RPRINTF(0,"%s", "---------- } interp_compute_vectors ----------------"
-                   "---\n");
-        SA_RPRINTF(0,"%s", "---------- interp_sparse_tent_assemble { -----------"
-                   "---\n");
+        SA_RPRINTF_NOTS(0, "%s", "        --> interp_sparse_tent_assemble\n");
     }
 
     SparseMatrix *tent_interp;
     tent_interp = interp_sparse_tent_assemble(agg_part_rels, interp_data,
                                               avoid_ess_bdr_dofs, svd_min_skip);
+    if (agg_part_rels.testmesh)
     {
-        SA_RPRINTF_NOTS(0, "%s",
-            "<<<< Save the tentative interpolant sparse matrix in a file\n");
         std::stringstream filename;
         filename << "tent_interp." << PROC_RANK << ".mat";
         std::ofstream out(filename.str().c_str());
         tent_interp->Print(out);
     }
-
-    SA_RPRINTF_L(0,4, "%s", "---------- } interp_sparse_tent_assemble -----------"
-                 "---\n");
 
     return tent_interp;
 }

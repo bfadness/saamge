@@ -105,7 +105,7 @@ agg_dof_status_t *fem_find_bdr_dofs(ParFiniteElementSpace& fes,
     const int ngroups = group_ldof.Size();
     const int n_ldofs = group_ldof.Width(); // = 0 in serial
 
-    SA_PRINTF("ndofs: %d, ngroups: %d, and n_ldofs: %d\n", ND, ngroups, n_ldofs);
+    // SA_PRINTF("ndofs: %d, ngroups: %d, and n_ldofs: %d\n", ND, ngroups, n_ldofs);
 
     int count = 0;
     for (int i=0; i < ND; ++i)
@@ -118,7 +118,7 @@ agg_dof_status_t *fem_find_bdr_dofs(ParFiniteElementSpace& fes,
         if (-1 != fes.GetLocalTDofNumber(i))
             SA_SET_FLAGS(bdr_dofs[i], AGG_OWNED_FLAG);
     }
-    SA_PRINTF("counted %d bdr dofs\n", count);
+    // SA_PRINTF("counted %d bdr dofs\n", count);
 
     int max_ldof = -1;
     for (int gr=1; gr < ngroups; ++gr)
@@ -134,7 +134,7 @@ agg_dof_status_t *fem_find_bdr_dofs(ParFiniteElementSpace& fes,
             SA_SET_FLAGS(bdr_dofs[ldofs[i]], AGG_ON_PROC_IFACE_FLAG);
         }
     }
-    SA_PRINTF("max_ldof: %d\n", max_ldof);
+    // SA_PRINTF("max_ldof: %d\n", max_ldof);
     // std::cout << "<<<< bdr_dofs:\n";
     // for (int i=0; i < ND; ++i)
     //     std::cout << std::setw(4) << std::left << i << " "
@@ -185,7 +185,6 @@ void fem_serial_visualize_gf(const Mesh& mesh, GridFunction& x,
 void fem_parallel_visualize_gf(const ParMesh& mesh, ParGridFunction& x,
                                const char *keys/*=""*/)
 {
-    SA_PRINTF_L(4, "%s", "Visualizing grid function in parallel...\n");
     char vishost[] = "localhost";
     int visport = GLVIS_PORT;
     // osockstream sol_sock(visport, vishost);
@@ -268,7 +267,6 @@ void fem_parallel_visualize_pwc_coef(ParMesh& mesh, Coefficient& coef,
 void fem_serial_visualize_partitioning(Mesh& mesh, int *partitioning,
                                        const char *keys/*=""*/)
 {
-    SA_PRINTF_L(4, "%s", "Visualizing partition in serial...\n");
     char vishost[] = "localhost";
     int visport = GLVIS_PORT;
     socketstream sol_sock(vishost, visport);
@@ -303,7 +301,6 @@ void fem_serial_visualize_partitioning(Mesh& mesh, int *partitioning,
 void fem_parallel_visualize_partitioning(ParMesh& mesh, int *partitioning,
                                          int parts, const char *keys/*=""*/)
 {
-    // SA_PRINTF_L(4, "%s", "Visualizing partition in parallel...\n");
     char vishost[] = "localhost";
     int visport = GLVIS_PORT;
     socketstream sol_sock(vishost, visport);
@@ -385,7 +382,6 @@ void fem_parallel_visualize_aggregates(ParFiniteElementSpace *fes,
                                        int *aggregates, int parts,
                                        const char *keys/*=""*/)
 {
-    SA_PRINTF_L(4, "%s", "Visualizing aggregates in parallel...\n");
     SA_ASSERT(fes);
     SA_ASSERT(aggregates);
     ParGridFunction x(fes);
