@@ -219,8 +219,8 @@ void ml_produce_hierarchy_from_level(
         SA_ASSERT(level+1 == ml_data.levels_list.num_levels);
     }
     SA_ASSERT(levels_check_list(ml_data.levels_list));
-    SA_RPRINTF_L(0,5, "LEVELS in levels_list = %d\n", ml_data.levels_list.num_levels);
-    SA_RPRINTF_L(0,5, "%s",
+    SA_RPRINTF_L(0, 9, "LEVELS in levels_list = %d\n", ml_data.levels_list.num_levels);
+    SA_RPRINTF_L(0, 9, "%s",
                  "END \\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/"
                  "\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/\\/"
                  "\\/\n");
@@ -392,10 +392,7 @@ ml_data_t * ml_produce_data(
     SA_ASSERT(mlp.get_num_coarsenings() > 0);
     SA_ASSERT(agg_part_rels);
 
-    SA_RPRINTF_NOTS(0, "%s", "<<<< ml_produce_data L382 ml.cpp\n");
-
-    // Coarsen the finest level.
-    SA_RPRINTF_NOTS(0, "%s", "---------- ml_produce_all { ---------------------\n");
+    SA_RPRINTF_NOTS(0, "%s", "ml_produce_data\n");
 
     tg_data_t *tg_data = tg_init_data(
         Ag, *agg_part_rels, mlp.get_nu_pro(0), mlp.get_nu_relax(0),
@@ -406,13 +403,11 @@ ml_data_t * ml_produce_data(
     
     tg_data->use_w_cycle = false;
     tg_data->polynomial_coarse_space = mlp.get_polynomial_coarse_space(0);
-    SA_RPRINTF_NOTS(0, "tg_data->polynomial_coarse_space: %d\n",
-        tg_data->polynomial_coarse_space);
 
     if (mlp.get_use_correct_nullspace() && 
         (1 == mlp.get_num_coarsenings() || mlp.get_use_double_cycle()) )
     {
-        SA_RPRINTF_NOTS(0, "%s", "<<<< set scaling_P = true\n");
+        SA_RPRINTF_NOTS(0, "%s", "set scaling_P = true\n");
         tg_data->interp_data->scaling_P = true;
     }
 
@@ -439,7 +434,6 @@ ml_data_t * ml_produce_data(
     }
     else
     {
-        SA_RPRINTF_NOTS(0, "%s", "<<<< else statement L445 ml.cpp\n");
         tg_build_hierarchy(Ag, *tg_data, *agg_part_rels, elem_data_finest,
             mlp.get_avoid_ess_bdr_dofs(), mlp.get_fixed_num_evecs(0), mlp.get_svd_min_skip());
     }
@@ -463,10 +457,8 @@ ml_data_t * ml_produce_data(
 
     if (SA_IS_OUTPUT_LEVEL(3))
     {
-        ml_print_data(Ag, *ml_data);
+        // ml_print_data(Ag, *ml_data);
     }
-
-    SA_RPRINTF_L(0,4, "%s", "---------- } ml_produce_all ---------------------\n");
 
     return ml_data;
 }

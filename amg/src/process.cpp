@@ -54,7 +54,7 @@ void proc_init(MPI_Comm comm)
     proc_info.comm = comm;
     MPI_Comm_size(proc_info.comm, &(proc_info.procs_num));
     MPI_Comm_rank(proc_info.comm, &(proc_info.rank));
-    SA_RPRINTF_NOTS(0, "Number of processes: %d\n", proc_info.procs_num);
+    // SA_RPRINTF_NOTS(0, "Number of processes: %d\n", proc_info.procs_num);
     PROC_CLEAR_STR_STREAM;
 }
 
