@@ -410,7 +410,8 @@ int xpacks_calc_upper_eigens_dense(const DenseMatrix& Ain, Vector& evals,
 }
 
 double xpack_cut_evects_small(const Vector& evals, const DenseMatrix& evects,
-                              double bound, DenseMatrix& cut_evects)
+                              double bound, DenseMatrix& cut_evects, int part,
+                              int agg_id)
 {
     const int evals_sz = evals.Size();
     const int height = evects.Height();
@@ -428,14 +429,28 @@ double xpack_cut_evects_small(const Vector& evals, const DenseMatrix& evects,
     }
 
     for (i=0; i < evals_sz && evals(i) <= bound; ++i);
-    SA_ALERT(0 < i);
 
     if (i < evals_sz)
         skipped = evals(i);
     else
         skipped = evals(evals_sz - 1);
 
-    if (0 >= i) i = 1;
+    bool all_skipped = false;
+    if (0 >= i)
+    {
+        i = 1;
+        all_skipped = true;
+    }
+
+    double ratio = -1.0; // sentinal value meaning all evals are kept
+    if (i != evals_sz)
+        ratio = evals(i)/(1e-12 + evals(i-1));
+    if (agg_id < 10 || part % (agg_id/ 10) == 0)
+        SA_PRINTF_NOTS(" has spectral ratio = %g\n", ratio);
+    if (all_skipped)
+        SA_PRINTF_NOTS(
+            "                CPU %d: warning: theta %g < smallest eigenvalue %g\n",
+            PROC_RANK, bound, evals(0));
 
     SA_PRINTF_L(9, "cut_evects cuts: %d, takes: %d, total: %d\n", evals_sz - i,
                 i, evals_sz);
