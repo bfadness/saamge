@@ -166,8 +166,10 @@ int xpacks_calc_upper_eigens_dense(const mfem::DenseMatrix& Ain, mfem::Vector& e
 
     \warning It leaves at least one vector not cut.
 */
+
 double xpack_cut_evects_small(const mfem::Vector& evals, const mfem::DenseMatrix& evects,
-                              double bound, mfem::DenseMatrix& cut_evects);
+                              double bound, mfem::DenseMatrix& cut_evects, int part,
+                              int agg_id);
 
 /*! \brief Remove eigenvectors for small eigenvalues (takes the large).
 

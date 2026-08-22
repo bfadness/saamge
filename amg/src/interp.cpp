@@ -405,7 +405,7 @@ void interp_compute_vectors(
     if (!transf || !readapting)
         spect_update = true;
 
-    SA_RPRINTF_NOTS(0, "theta: %g, tol: %g\n", theta, tol);
+    SA_RPRINTF_NOTS(0, "                theta: %g, tol: %g\n", theta, tol);
 
     int arpack_size_threshold;
     if (interp_data.use_arpack)
@@ -413,13 +413,13 @@ void interp_compute_vectors(
     else
         arpack_size_threshold = std::numeric_limits<int>::max();
     Eigensolver eigensolver(agg_part_rels.mises, agg_part_rels,
-                            arpack_size_threshold);
+                            arpack_size_threshold, all_eigens);
 
     // Loop over AEs.
     for (int i=0; i<nparts; ++i)
     {
         if (nparts < 10 || i % (nparts / 10) == 0)
-            SA_RPRINTF_NOTS(0, "local eigenvalue problem %d/%d\n", i, nparts);
+            SA_PRINTF_NOTS("                CPU %d: local eigenvalue problem %d/%d", PROC_RANK, i+1, nparts);
         bool local_added = false;
         const Matrix *AE_stiffm;
         Vector xbad_AE;
@@ -537,13 +537,12 @@ void interp_compute_vectors(
 
         if (spect_update)
         {
-            SA_RPRINTF_NOTS(0, "%s", "<<<< Solve local eigenvalue problem L539\n");
             int agg_size = -1; // this only has any effect
                                // if we are doing the schur eigenproblem...
             if (agg_part_rels.mises_size != NULL)
                 agg_size = agg_part_rels.mises_size[i];
             local_added = eigensolver.Solve(
-                *AE_stiffm, rhs_matrices_arr[i], i, i,
+                *AE_stiffm, rhs_matrices_arr[i], i, nparts,
                 agg_size, theta_local, *(cut_evects_arr[i]), fixed_num_evecs);
 
 #if 0
