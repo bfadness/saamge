@@ -218,7 +218,8 @@ bool Eigensolver::SolveDirect(
 
         // Take only the eigenvectors with eigenvalue <= theta * lmax
         // Store them in *cut_ptr
-        skipped = xpack_cut_evects_small(evals, evects, theta * evals(evals.Size() - 1), *cut_ptr);
+        skipped = xpack_cut_evects_small(
+            evals, evects, theta * evals(evals.Size() - 1), *cut_ptr, part, agg_id);
         SA_PRINTF_L(9, "skipped = %g, largest: %g\n", skipped,
                     evals(evals.Size() - 1));
         SA_ASSERT(SA_REAL_ALMOST_LE(skipped, evals(evals.Size() - 1)));
@@ -231,6 +232,10 @@ bool Eigensolver::SolveDirect(
         xpacks_calc_lower_eigens_dense(*deA, evals, *cut_ptr, deB, theta * lmax,
                                        true, fixed_num);
     }
+    if (agg_id < 10 || part % (agg_id/ 10) == 0)
+        SA_PRINTF_NOTS("                CPU %d: keep %d/%d eigens\n",
+            PROC_RANK, cut_ptr->Width(), deA->Size());
+
     if (SA_IS_OUTPUT_LEVEL(9))
     {
         SA_PRINTF("theta * lmax: %g\n", theta * lmax);

@@ -510,7 +510,7 @@ void tg_build_hierarchy(HypreParMatrix& Ag, tg_data_t& tg_data,
     double useless_parameter = 0.; // Essentially, not used.
 
     //XXX: Currently, we see no reason to actually compute all eigenpairs.
-    const bool all_eigens = false;
+    const bool all_eigens = true;
 
     delete tg_data.ltent_interp;
     delete tg_data.tent_interp;
