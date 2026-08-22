@@ -216,9 +216,7 @@ int tg_solve(HypreParMatrix& A, HypreParVector& b, HypreParVector& x,
              tg_recalc_res_ft recalc_res, tg_data_t *tg_data, double rtol,
              double atol, double reducttol, bool output/*=true*/)
 {
-    int i;
-    double rr, end, rr_prev = 1., reduction = -1.;
-    HypreParVector *res = NULL, *psres = NULL;
+    HypreParVector *res = nullptr, *psres = nullptr;
 
     SA_ASSERT(A.GetGlobalNumRows() == A.GetGlobalNumCols());
     SA_ASSERT(mbox_parallel_vector_size(b) == A.GetGlobalNumRows());
@@ -232,36 +230,16 @@ int tg_solve(HypreParMatrix& A, HypreParVector& b, HypreParVector& x,
     x_prev = new HypreParVector(PROC_COMM, A.GetGlobalNumRows(), p, A.GetRowStarts());
     mbox_make_owner_data(*x_prev);
 
-    rr = tg_calc_res_tgprod(A, b, x, res, psres, tg_data);
-    if ((end = rtol * rr) < atol)
-        end = atol;
+    double rr = tg_calc_res_tgprod(A, b, x, res, psres, tg_data);
+    double end = std::max(rr*rtol*rtol, atol * atol);
+    SA_ASSERT(end >= 0.0);
     if (output)
         SA_RPRINTF_L(0,2, "Stationary iteration end tolerance: %g\n", end);
-    SA_ASSERT(end >= 0.);
-    for (i=1; i <= maxiter && rr > end; ++i)
-    {
-        if (output && 0 == PROC_RANK && SA_IS_OUTPUT_LEVEL(2))
-            PROC_STR_STREAM << "Stationary iteration: after " << i-1
-                            << " iterations | (r,r) = " << rr
-                            << ", reduction: ";
-        if (i>2)
-        {
-            reduction = rr / rr_prev;
-            if (output && 0 == PROC_RANK && SA_IS_OUTPUT_LEVEL(2))
-            {
-                PROC_STR_STREAM << reduction << "\n";
-                SA_PRINTF("%s", PROC_STR_STREAM.str().c_str());
-                PROC_CLEAR_STR_STREAM;
-            }
-            if (reduction > reducttol)
-                break;
-        } else if (output && 0 == PROC_RANK && SA_IS_OUTPUT_LEVEL(2))
-        {
-            PROC_STR_STREAM << "wait\n";
-            SA_PRINTF("%s", PROC_STR_STREAM.str().c_str());
-            PROC_CLEAR_STR_STREAM;
-        }
 
+    int i;
+    double rr_prev, reduction;
+    for (i = 0; i < maxiter; ++i)
+    {
         (*x_prev) = x;
         tg_cycle_atb(A, *(tg_data->Ac), *(tg_data->interp), *(tg_data->restr), b,
                      tg_data->pre_smoother, tg_data->post_smoother, x,
@@ -269,33 +247,25 @@ int tg_solve(HypreParMatrix& A, HypreParVector& b, HypreParVector& x,
 
         rr_prev = rr;
         rr = tg_recalc_res_tgprod(A, b, x, *x_prev, *res, *psres, tg_data);
+        reduction = rr / rr_prev;
+        if (output)
+            SA_RPRINTF_NOTS_L(0, 2, "        iteration %2d: (B r, r) = %12.5e "
+                ", reduction: %12.5e\n", i, rr, reduction);
+    if (rr < end)
+        break;
     }
-    if (output)
-        SA_RPRINTF_L(0, 2, "Stationary iteration: after %d iterations"
-                           " | (r,r) = %g, reduction: %g\n", i-1, rr,
-                           rr / rr_prev);
 
-    if (rr > end)
+    if (output)
     {
-        if (SA_IS_OUTPUT_LEVEL(2) && output)
-        {
-            if (maxiter + 1 == i)
-                SA_PRINTF("%s", "Stationary iteration: Maximum allowed"
-                                " iterations reached without computing a"
-                                " solution!\n");
-            else
-                SA_PRINTF("Stationary iteration: Reduction factor is worse than"
-                          " %g\n", reducttol);
-        }
-        SA_ASSERT(maxiter + 1 == i || reduction > reducttol);
-        delete res;
-        delete psres;
-        return -(i-1);
+        if (maxiter == i)
+            SA_RPRINTF_L(0, 2, "%s", "Stationary iteration: Maximum allowed"
+                            " iterations reached without computing a"
+                            " solution!\n");
     }
 
     delete res;
     delete psres;
-    return i-1;
+    return i;
 }
 
 int tg_pcg_solve(HypreParMatrix& A, HypreParVector& b, HypreParVector& x,
@@ -317,14 +287,14 @@ int tg_run(HypreParMatrix& A,
            double atol, double reducttol, tg_data_t *tg_data, bool zero_rhs,
            bool output/*=true*/)
 {
-    int tgiters=0;
-    HypreParVector *x_past = NULL;
 
     SA_ASSERT(tg_data);
-
     if (output)
         SA_RPRINTF_L(0,4, "%s", "---------- tg_solve { -----------------------\n");
     tg_fillin_coarse_operator(A, tg_data, true);
+
+    int tgiters = 0;
+    HypreParVector *x_past = nullptr;
     if (zero_rhs)
     {
         int reason;
@@ -346,27 +316,17 @@ int tg_run(HypreParMatrix& A,
             SA_RPRINTF(0,"Average convergence factor: %g\n", acf);
             SA_RPRINTF(0,"(Asymptotic) convergence factor: %g\n", cf);
         }
-    } else
+    }
+    else
     {
         tgiters = tg_solve(A, b, x, x_past, maxiter, tg_calc_res_tgprod,
                            tg_recalc_res_tgprod, tg_data, rtol, atol, reducttol,
                            output);
-        if (SA_IS_OUTPUT_LEVEL(3) && output)
-        {
-            HypreParVector *res, *psres;
-            SA_PRINTF("Last residual (r,r): %g\n",
-                      tg_calc_res_tgprod(A, b, x, res, psres, tg_data));
-            delete res;
-            delete psres;
-        }
-        delete x_past;
     }
-    if (output)
-    {
-        SA_RPRINTF_L(0,2, "Iterations: %d\n", tgiters);
-        SA_RPRINTF_L(0,4, "%s", "---------- } tg_solve -----------------------\n");
-    }
-
+    // note that tg_solve returns x_{k+1}
+    if (x_past)
+        x = *x_past;
+    delete x_past;
     return tgiters;
 }
 
