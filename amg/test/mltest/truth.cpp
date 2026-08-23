@@ -1,7 +1,7 @@
 #include <algorithm> // std::minmax_element
+#include <memory>    // std::unique_ptr
 #include <mfem.hpp>
 #include <mpi.h>
-#include <memory>
 #include <numeric>   // std::accumulate
 #include "saamge.hpp"
 
@@ -286,11 +286,9 @@ int main(int argc, char *argv[])
         Al.Print(out);
     }
 */
-    Vector true_x(fes.GetTrueVSize());
-    true_x = 0.0;
-    Vector true_rhs(true_x.Size());
 
-    b.ParallelAssemble(true_rhs);
+    std::unique_ptr<HypreParVector> X(x.GetTrueDofs());
+    std::unique_ptr<HypreParVector> B(b.ParallelAssemble());
     std::unique_ptr<HypreParMatrix> A(a.ParallelAssemble());
 
     HypreBoomerAMG amg(*A);
@@ -302,10 +300,10 @@ int main(int argc, char *argv[])
     pcg.SetRelTol(1e-6); // for some reason MFEM squares this...
     pcg.SetMaxIter(1000);
     pcg.SetPrintLevel(2);
-    pcg.Mult(true_rhs, true_x);
-    x.Distribute(true_x);
     if (visualize)
         fem_parallel_visualize_gf(pmesh, x);
+    pcg.Mult(*B, *X);
+    x.Distribute(*X);
 
     double error = x.ComputeL2Error(sol);
     SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %f\n", error);
