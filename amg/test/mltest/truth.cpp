@@ -135,9 +135,9 @@ int main(int argc, char *argv[])
     int first_elems_per_agg = -1;
     args.AddOption(&first_elems_per_agg, "-fe", "--first-elems-per-agg",
                    "Number of elements per AE for first (finest) coarsening.");
-    int generate_mesh = -1;
-    args.AddOption(&generate_mesh, "--generate-mesh", "--generate-mesh",
-                   "Generate 2D quad mesh with this number of elements per side.");
+    int nxy = 4;
+    args.AddOption(&nxy, "-nxy", "--num_elem_per_dim",
+                   "Generate 2D triangular mesh with this number of elements per side.");
     bool minimal_coarse = false;
     bool linear_coarse = false;
     args.AddOption(&linear_coarse, "-lc", "--linear-coarse",
@@ -195,9 +195,9 @@ int main(int argc, char *argv[])
                               // not mess up the parameters above
     bool mltest = false;
     Mesh *mesh;
-    if (generate_mesh > 0)
+    if (nxy > 0)
     {
-        mesh = new Mesh(generate_mesh, generate_mesh, Element::QUADRILATERAL, 1);
+        mesh = new Mesh(nxy, nxy, Element::TRIANGLE, 1);
     }
     else
     {
