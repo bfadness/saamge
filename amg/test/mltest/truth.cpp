@@ -1,6 +1,8 @@
+#include <algorithm> // std::minmax_element
 #include <mfem.hpp>
 #include <mpi.h>
 #include <memory>
+#include <numeric>   // std::accumulate
 #include "saamge.hpp"
 
 using namespace mfem;
@@ -27,6 +29,8 @@ double bdr_cond(Vector &x)
     SA_ASSERT(2 == x.Size());
     return 0.0;
 }
+
+void print_mises_info(const agg_partitioning_relations_t &agg_part_rels);
 
 /**
    do the agglomerate partitioning for mltest mesh
@@ -356,6 +360,7 @@ int main(int argc, char *argv[])
         mlp.set_polynomial_coarse_space(0, 1);
 
     ml_data_t *ml_data(ml_produce_data(*A, agg_part_rels, emp, mlp));
+    print_mises_info(*agg_part_rels);
 
     ml_free_data(ml_data);
     agg_part_rels->partitioning = nullptr; // prevent double free of element_agglomerate
@@ -363,4 +368,16 @@ int main(int argc, char *argv[])
     delete []nparts_arr;
 
     return 0;
+}
+
+void print_mises_info(const agg_partitioning_relations_t &agg_part_rels)
+{
+    const int *arr = agg_part_rels.mises_size;
+    const int n = agg_part_rels.num_owned_mises;
+
+    auto result = std::minmax_element(arr, arr + n);
+    double sum = std::accumulate(arr, arr + n, 0.0);
+
+    SA_RPRINTF(0, "Size of MISes (min | avg | max): (%d | %g | %d)\n",
+        *result.first, sum / static_cast<double>(n), *result.second);
 }
