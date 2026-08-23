@@ -6,6 +6,7 @@
 using namespace mfem;
 using namespace saamge;
 
+using std::endl;
 double tau(2*M_PI);
 
 double sol_func(Vector& x)
@@ -178,7 +179,10 @@ int main(int argc, char *argv[])
         return 1;
     }
     if (0 == myid)
+    {
         args.PrintOptions(cout);
+        cout << endl;
+    }
 
     if (first_elems_per_agg < 0) first_elems_per_agg = elems_per_agg;
     if (first_theta < 0.0) first_theta = theta;
