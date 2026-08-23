@@ -314,10 +314,11 @@ int main(int argc, char *argv[])
     SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %f\n\n", error);
 
     std::ostringstream sol_name;
-    sol_name << "sol." << std::setfill('0') << std::setw(6) << myid;
+    sol_name << "sol1." << std::setfill('0') << std::setw(6) << myid;
     std::ofstream sol_ofs(sol_name.str().c_str());
     sol_ofs.precision(8);
     x.Save(sol_ofs);
+    sol_ofs.close();
 
 /********************************************************************************/
 
@@ -395,6 +396,14 @@ int main(int argc, char *argv[])
 
     error = x.ComputeL2Error(sol);
     SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %f\n\n", error);
+
+    sol_name.str("");
+    sol_name.clear();
+    sol_name << "sol2." << std::setfill('0') << std::setw(6) << myid;
+    sol_ofs.open(sol_name.str().c_str());
+    sol_ofs.precision(8);
+    x.Save(sol_ofs);
+    sol_ofs.close();
 
     ml_free_data(ml_data);
     agg_part_rels->partitioning = nullptr; // prevent double free of element_agglomerate
