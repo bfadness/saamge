@@ -297,14 +297,16 @@ int main(int argc, char *argv[])
     HypreBoomerAMG amg(*A);
     amg.SetPrintLevel(0);
 
+    // use the same tolerance for all conjugate gradient runs
+    const double rel_tol = 1e-6;
+    const double max_iter = 1000;
+
     CGSolver pcg(active_comm);
     pcg.SetPreconditioner(amg);
     pcg.SetOperator(*A);
-    pcg.SetRelTol(1e-6); // for some reason MFEM squares this...
-    pcg.SetMaxIter(1000);
-    pcg.SetPrintLevel(2);
-    if (visualize)
-        fem_parallel_visualize_gf(pmesh, x);
+    pcg.SetRelTol(rel_tol); // for some reason MFEM squares this...
+    pcg.SetMaxIter(max_iter);
+    pcg.SetPrintLevel(1);
     pcg.Mult(*B, *X);
     x.Distribute(*X);
 
