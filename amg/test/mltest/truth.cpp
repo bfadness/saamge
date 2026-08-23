@@ -209,8 +209,8 @@ int main(int argc, char *argv[])
         if (20 == mesh->GetNV() && 12 == mesh->GetNE() &&
             0 == times_refine && 2 == num_levels) // not very general...
             mltest = true;
-        SA_RPRINTF_NOTS(0, "<<<< bool mltest = %d\n", mltest);
     }
+    SA_RPRINTF_NOTS(0, "<<<< bool mltest = %d\n", mltest);
     const int dim = mesh->Dimension();
     int nprocs = mpi.WorldSize();
     float ratio = (float)nprocs/mesh->GetNE();
@@ -246,8 +246,11 @@ int main(int argc, char *argv[])
     const int pNV = pmesh.GetNV();
     const int pNE = pmesh.GetNE();
     const int pND = fes.GetNDofs();
-    const int ND = fes.GlobalTrueVSize();
-    SA_RPRINTF_NOTS(0, "pNV: %d, pNE: %d, pND: %d, ND: %d\n", pNV, pNE, pND, ND);
+    const int gNE = pmesh.GetGlobalNE();
+    const int gND = fes.GlobalTrueVSize();
+
+    SA_PRINTF("pNV: %d, pNE: %d, pND: %d, gNE: %d, gND: %d\n",
+        pNV, pNE, pND, gNE, gND);
 
     std::ostringstream mesh_name;
     mesh_name << "mesh." << std::setfill('0') << std::setw(6) << myid;
@@ -306,7 +309,7 @@ int main(int argc, char *argv[])
     x.Distribute(*X);
 
     double error = x.ComputeL2Error(sol);
-    SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %f\n", error);
+    SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %f\n\n", error);
 
     std::ostringstream sol_name;
     sol_name << "sol." << std::setfill('0') << std::setw(6) << myid;
@@ -334,7 +337,6 @@ int main(int argc, char *argv[])
         for (int i=1; i<num_levels-1; ++i)
             nparts_arr[i] = std::lround(
                 static_cast<double>(nparts_arr[i-1]) / elems_per_agg);
-        SA_RPRINTF_NOTS(0, "%s", "Get the agglomerate mesh partition relations\n");
         agg_part_rels = fem_create_partitioning(
             *A, fes, bdr_dofs, nparts_arr, do_aggregates_here);
     }
