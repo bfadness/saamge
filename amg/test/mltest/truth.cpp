@@ -143,10 +143,10 @@ int main(int argc, char *argv[])
     args.AddOption(&linear_coarse, "-lc", "--linear-coarse",
                    "-nlc", "--no-linear-coarse",
                    "Add linear functions to coarse basis (only for finest coarsening).");
-    bool correct_nulspace = true;
-    args.AddOption(&correct_nulspace, "-c", "--correct-nulspace",
-                   "-nc", "--no-correct-nulspace",
-                   "Use the corrected nulspace technique on coarsest level.");
+    bool correct_nullspace = false;
+    args.AddOption(&correct_nullspace, "-c", "--correct-nullspace",
+                   "-nc", "--no-correct-nullspace",
+                   "Use the corrected nullspace technique on coarsest level.");
     bool double_cycle = false;
     args.AddOption(&double_cycle, "-d", "--double-cycle",
                    "-nd", "--no-double-cycle",
@@ -189,7 +189,7 @@ int main(int argc, char *argv[])
     if (first_nu_pro < 0) first_nu_pro = nu_pro;
 
     // Do not do both corrected nullspace technique and coarse space of just ones vector
-    SA_ASSERT(!(correct_nulspace && minimal_coarse));
+    SA_ASSERT(!(correct_nullspace && minimal_coarse));
 
     MPI_Barrier(active_comm); // try to make MFEM's debug element orientation prints
                               // not mess up the parameters above
@@ -348,7 +348,7 @@ int main(int argc, char *argv[])
     int polynomial_coarse(minimal_coarse ? 0 : -1);
     MultilevelParameters mlp(
         num_levels-1, nparts_arr, first_nu_pro, nu_pro, nu_relax,
-        first_theta, theta, polynomial_coarse, correct_nulspace,
+        first_theta, theta, polynomial_coarse, correct_nullspace,
         !direct_eigensolver, do_aggregates);
     mlp.set_use_double_cycle(double_cycle);
     mlp.set_coarse_direct(coarse_direct);
