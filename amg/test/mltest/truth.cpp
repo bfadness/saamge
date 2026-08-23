@@ -3,6 +3,8 @@
 #include <mfem.hpp>
 #include <mpi.h>
 #include <numeric>   // std::accumulate
+#include <vector>    // std::vector
+
 #include "saamge.hpp"
 
 using namespace mfem;
