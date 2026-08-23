@@ -319,6 +319,8 @@ int main(int argc, char *argv[])
     sol_ofs.precision(8);
     x.Save(sol_ofs);
 
+/********************************************************************************/
+
     // AMGe code begins here
     std::vector<int> element_agglomerate;
     int *nparts_arr = new int[num_levels-1];
@@ -363,6 +365,21 @@ int main(int argc, char *argv[])
 
     ml_data_t *ml_data(ml_produce_data(*A, agg_part_rels, emp, mlp));
     print_mises_info(*agg_part_rels);
+
+    // argument 0 means fine level
+    levels_level_t *level = levels_list_get_level(ml_data->levels_list, 0);
+
+    // reset the values in X
+    x.ProjectCoefficient(bdr_coeff);
+    x.GetTrueDofs(*X);
+
+/********************************************************************************/
+
+    const int iter = tg_run(*A, agg_part_rels, *X, *B, max_iter,
+        rel_tol, 0.0, 1.0, level->tg_data, false);
+    x.Distribute(*X);
+    error = x.ComputeL2Error(sol);
+    SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %f\n\n", error);
 
     ml_free_data(ml_data);
     agg_part_rels->partitioning = nullptr; // prevent double free of element_agglomerate
