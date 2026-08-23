@@ -381,6 +381,21 @@ int main(int argc, char *argv[])
     error = x.ComputeL2Error(sol);
     SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %f\n\n", error);
 
+/********************************************************************************/
+
+    x.ProjectCoefficient(bdr_coeff);
+    x.GetTrueDofs(*X);
+
+    Solver *amge = new VCycleSolver(level->tg_data, false); // interactive_mode
+    amge->SetOperator(*A);
+    pcg.SetPreconditioner(*amge);
+    pcg.SetOperator(*A);
+    pcg.Mult(*B, *X);
+    x.Distribute(*X);
+
+    error = x.ComputeL2Error(sol);
+    SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %f\n\n", error);
+
     ml_free_data(ml_data);
     agg_part_rels->partitioning = nullptr; // prevent double free of element_agglomerate
     agg_free_partitioning(agg_part_rels);
