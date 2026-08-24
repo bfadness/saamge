@@ -314,7 +314,7 @@ int main(int argc, char *argv[])
     x.Distribute(*X);
 
     double error = x.ComputeL2Error(sol);
-    SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %f\n\n", error);
+    SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %12.5e\n\n", error);
 
     std::ostringstream sol_name;
     sol_name << "sol1." << std::setfill('0') << std::setw(6) << myid;
@@ -383,7 +383,7 @@ int main(int argc, char *argv[])
         rel_tol, 0.0, 1.0, level->tg_data, false);
     x.Distribute(*X);
     error = x.ComputeL2Error(sol);
-    SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %f\n\n", error);
+    SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %12.5e\n\n", error);
 
 /********************************************************************************/
 
@@ -398,7 +398,7 @@ int main(int argc, char *argv[])
     x.Distribute(*X);
 
     error = x.ComputeL2Error(sol);
-    SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %f\n\n", error);
+    SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %12.5e\n\n", error);
 
     sol_name.str("");
     sol_name.clear();
