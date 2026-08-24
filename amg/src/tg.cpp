@@ -239,6 +239,7 @@ int tg_solve(HypreParMatrix& A, HypreParVector& b, HypreParVector& x,
 
     int i;
     double rr_prev, reduction;
+    const double rr0 = rr;
     for (i = 0; i < maxiter; ++i)
     {
         (*x_prev) = x;
@@ -263,6 +264,8 @@ int tg_solve(HypreParMatrix& A, HypreParVector& b, HypreParVector& x,
                             " iterations reached without computing a"
                             " solution!\n");
     }
+    SA_RPRINTF_NOTS_L(0, 2, "%50saverage: %12.5e\n",
+        "", std::pow(rr/rr0, 0.5/i));
 
     delete res;
     delete psres;
