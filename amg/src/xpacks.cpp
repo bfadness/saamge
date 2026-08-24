@@ -416,7 +416,8 @@ double xpack_cut_evects_small(const Vector& evals, const DenseMatrix& evects,
     const int evals_sz = evals.Size();
     const int height = evects.Height();
     int i;
-    double skipped = 0.;
+    double skipped = 0.0;
+    bool all_skipped = false;
 
     if (SA_IS_OUTPUT_LEVEL(9))
     {
@@ -428,31 +429,17 @@ double xpack_cut_evects_small(const Vector& evals, const DenseMatrix& evects,
         PROC_CLEAR_STR_STREAM;
     }
 
-    for (i=0; i < evals_sz && evals(i) <= bound; ++i);
+    // evals(i-1) is kept, and evals(i) is skipped
+    for (i = 0; i < evals_sz && evals(i) <= bound; ++i);
 
-    if (i < evals_sz)
-        skipped = evals(i);
-    else
-        skipped = evals(evals_sz - 1);
-
-    bool all_skipped = false;
-    if (0 >= i)
+    // all nonzero eigenvalues were skipped, so keep the smallest one
+    if (0 == i)
     {
-        i = 1;
         all_skipped = true;
+        i = 1;
     }
 
-    double ratio = -1.0; // sentinal value meaning all evals are kept
-    if (i != evals_sz)
-        ratio = evals(i)/(1e-12 + evals(i-1));
-    if (agg_id < 10 || part % (agg_id/ 10) == 0)
-        SA_PRINTF_NOTS(" has spectral ratio = %g\n", ratio);
-    if (all_skipped)
-        SA_PRINTF_NOTS(
-            "                CPU %d: warning: theta %g < smallest eigenvalue %g\n",
-            PROC_RANK, bound, evals(0));
-
-    SA_PRINTF_L(9, "cut_evects cuts: %d, takes: %d, total: %d\n", evals_sz - i,
+    SA_PRINTF_L(9, "cut_evects cuts: %d, takes: %d, total: %d\n", evals_sz-i,
                 i, evals_sz);
 
     SA_ASSERT(i <= evects.Width() && evects.Width() == evals_sz);
@@ -460,6 +447,35 @@ double xpack_cut_evects_small(const Vector& evals, const DenseMatrix& evects,
     cut_evects.SetSize(height, i);
     memcpy(cut_evects.Data(), evects.Data(), sizeof(double) * i * height);
 
+    // all eigenvalues were kept, so ratio is not computed
+    if (i == evals_sz)
+    {
+        SA_PRINTF_NOTS(" keeps all eigenvalues\n");
+        skipped = evals(evals_sz-1);
+        return skipped;
+    }
+    else
+        skipped = evals(i);
+
+    if (agg_id < 10 || part % (agg_id / 10) == 0)
+    {
+        const double eps = 1e-8;
+        double ratio = -1.0;
+        // for evals(i-1) = 0, measure the relative gap instead of the ratio
+        if (evals(i-1) < eps)
+        {
+            ratio = evals(i) / evals(evals_sz-1);
+            SA_PRINTF_NOTS(" has gap measurement = %g\n", ratio);
+        }
+        else
+        {
+            ratio = evals(i) / evals(i-1);
+            SA_PRINTF_NOTS(" has spectral ratio = %g\n", ratio);
+            if (all_skipped)
+                SA_PRINTF_NOTS("%16sCPU %d: warning: theta %g < eigenvalue %g\n",
+                    "", PROC_RANK, bound, evals(i-1));
+        }
+    }
     return skipped;
 }
 
