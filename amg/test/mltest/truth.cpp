@@ -385,6 +385,13 @@ int main(int argc, char *argv[])
     error = x.ComputeL2Error(sol);
     SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %12.5e\n\n", error);
 
+    sol_name.str("");
+    sol_name.clear();
+    sol_name << "sol2." << std::setfill('0') << std::setw(6) << myid;
+    sol_ofs.open(sol_name.str().c_str());
+    sol_ofs.precision(8);
+    x.Save(sol_ofs);
+    sol_ofs.close();
 /********************************************************************************/
 
     x.ProjectBdrCoefficient(bdr_coeff, ess_bdr);
@@ -402,7 +409,7 @@ int main(int argc, char *argv[])
 
     sol_name.str("");
     sol_name.clear();
-    sol_name << "sol2." << std::setfill('0') << std::setw(6) << myid;
+    sol_name << "sol3." << std::setfill('0') << std::setw(6) << myid;
     sol_ofs.open(sol_name.str().c_str());
     sol_ofs.precision(8);
     x.Save(sol_ofs);
