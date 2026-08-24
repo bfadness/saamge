@@ -264,9 +264,12 @@ int main(int argc, char *argv[])
     FunctionCoefficient rhs(rhs_func);
     ConstantCoefficient conduct_func(1.0);
 
+    Array<int> ess_bdr(pmesh.bdr_attributes.Max());
+    ess_bdr = 1;
+
     ParGridFunction x(&fes);
     FunctionCoefficient bdr_coeff(bdr_cond);
-    x.ProjectCoefficient(bdr_coeff);
+    x.ProjectBdrCoefficient(bdr_coeff, ess_bdr);
 
     ParLinearForm b(&fes);
     b.AddDomainIntegrator(new DomainLFIntegrator(rhs));
@@ -276,8 +279,6 @@ int main(int argc, char *argv[])
     a.AddDomainIntegrator(new mfem::DiffusionIntegrator(conduct_func));
     a.Assemble();
 
-    Array<int> ess_bdr(pmesh.bdr_attributes.Max());
-    ess_bdr = 1;
     const bool keep_diag = true;
     a.EliminateEssentialBC(ess_bdr, x, b, keep_diag);
     a.Finalize();
@@ -373,7 +374,7 @@ int main(int argc, char *argv[])
     levels_level_t *level = levels_list_get_level(ml_data->levels_list, 0);
 
     // reset the values in X
-    x.ProjectCoefficient(bdr_coeff);
+    x.ProjectBdrCoefficient(bdr_coeff, ess_bdr);
     x.GetTrueDofs(*X);
 
 /********************************************************************************/
@@ -386,7 +387,7 @@ int main(int argc, char *argv[])
 
 /********************************************************************************/
 
-    x.ProjectCoefficient(bdr_coeff);
+    x.ProjectBdrCoefficient(bdr_coeff, ess_bdr);
     x.GetTrueDofs(*X);
 
     Solver *amge = new VCycleSolver(level->tg_data, false); // interactive_mode
