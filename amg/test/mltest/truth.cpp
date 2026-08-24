@@ -15,15 +15,17 @@ double tau(2*M_PI);
 
 double sol_func(Vector& x)
 {
-    const double xi(x(0));
-    const double xj(x(1));
-    return sin(tau*xi) * sin(tau*xj);
+    // const double xi(x(0));
+    // const double xj(x(1));
+    // return sin(tau*xi) * sin(tau*xj);
+    return 0.0;
 }
 
 double rhs_func(Vector &x)
 {
     SA_ASSERT(2 == x.Size());
-    return 2*pow(tau, 2) * sol_func(x);
+    // return 2*pow(tau, 2) * sol_func(x);
+    return 0.0;
 }
 
 double bdr_cond(Vector &x)
@@ -269,6 +271,8 @@ int main(int argc, char *argv[])
 
     ParGridFunction x(&fes);
     FunctionCoefficient bdr_coeff(bdr_cond);
+    const int seed = 0;
+    x.Randomize(seed);
     x.ProjectBdrCoefficient(bdr_coeff, ess_bdr);
 
     ParLinearForm b(&fes);
@@ -374,6 +378,7 @@ int main(int argc, char *argv[])
     levels_level_t *level = levels_list_get_level(ml_data->levels_list, 0);
 
     // reset the values in X
+    x.Randomize(seed);
     x.ProjectBdrCoefficient(bdr_coeff, ess_bdr);
     x.GetTrueDofs(*X);
 
@@ -382,6 +387,7 @@ int main(int argc, char *argv[])
     const int iter = tg_run(*A, agg_part_rels, *X, *B, max_iter,
         rel_tol, 0.0, 1.0, level->tg_data, false);
     x.Distribute(*X);
+
     error = x.ComputeL2Error(sol);
     SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %12.5e\n\n", error);
 
@@ -392,8 +398,10 @@ int main(int argc, char *argv[])
     sol_ofs.precision(8);
     x.Save(sol_ofs);
     sol_ofs.close();
+
 /********************************************************************************/
 
+    x.Randomize(seed);
     x.ProjectBdrCoefficient(bdr_coeff, ess_bdr);
     x.GetTrueDofs(*X);
 
