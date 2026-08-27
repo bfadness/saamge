@@ -330,7 +330,6 @@ int main(int argc, char *argv[])
             mesh->UniformRefinement();
         }
     }
-    SA_RPRINTF_NOTS(0,"NV: %d, NE: %d\n", mesh->GetNV(), mesh->GetNE());
 
     std::vector<int> proc_partitioning;
     int *raw_ptr = nullptr;
@@ -357,8 +356,10 @@ int main(int argc, char *argv[])
     const int gNE = pmesh.GetGlobalNE();
     const int gND = fes.GlobalTrueVSize();
 
-    SA_PRINTF("pNV: %d, pNE: %d, pND: %d, gNE: %d, gND: %d\n",
-        pNV, pNE, pND, gNE, gND);
+    SA_RPRINTF_NOTS(0, "<<<< %d agglomerates\n", pNE / first_elems_per_agg);
+    SA_PRINTF("gNE: %d, gND: %d\n", gNE, gND);
+    SA_PRINTF("pNE: %d, pND: %d\n", pNE, pND);
+
 
     std::ostringstream mesh_name;
     mesh_name << "mesh." << std::setfill('0') << std::setw(6) << myid;
