@@ -15,7 +15,7 @@ using namespace saamge;
 using std::endl;
 double tau(2*M_PI);
 
-double sol_func(Vector& x)
+double sol_func(Vector &x)
 {
     // const double xi(x(0));
     // const double xj(x(1));
