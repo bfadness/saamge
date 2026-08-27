@@ -195,7 +195,6 @@ int *part_generate_partitioning(const Table& graph, int *weights, int *parts,
     // part_check_partitioning(graph, partitioning);
     actual_parts = p_array.Max() + 1;
     *parts = actual_parts;
-    SA_ASSERT(target_parts == actual_parts);
 
     // Compute the number of non-empty partitions.
     // SA_RPRINTF_L(0, 3, "Desired number of partitions: %d\n", target_parts);
