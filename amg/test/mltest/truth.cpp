@@ -1,8 +1,10 @@
 #include <algorithm> // std::minmax_element
+#include <cmath>     // std::floor, std::pow
 #include <memory>    // std::unique_ptr
 #include <mfem.hpp>
 #include <mpi.h>
 #include <numeric>   // std::accumulate
+#include <random>    // std::mt19937
 #include <vector>    // std::vector
 
 #include "saamge.hpp"
@@ -32,6 +34,108 @@ double bdr_cond(Vector &x)
 {
     SA_ASSERT(2 == x.Size());
     return 0.0;
+}
+
+void tensor_func(const Vector &x, DenseMatrix &K)
+{
+    const int dim = x.Size();
+    SA_ASSERT(2 == dim || 3 == dim);
+
+    K.SetSize(dim);
+
+    double b[3];
+    const double theta = 2.0 * M_PI * (x(0) + x(1));
+    b[0] = std::cos(theta);
+    b[1] = std::sin(theta);
+    if (3 == dim)
+    {
+        const double phi = M_PI * x(2);
+        b[0] *= std::sin(phi);
+        b[1] *= std::sin(phi);
+        b[2] = std::cos(phi);
+    }
+    // norm squared gives magnitude for anisotropy ratio
+    const double norm = 1e2;
+    for (int i = 0; i < dim; ++i)
+        b[i] *= norm;
+
+    for (int i = 0; i < dim; ++i)
+    {
+        for (int j = 0; j < dim; ++j)
+            K(i, j) = b[i] * b[j];
+        K(i, i) += 1.0;
+    }
+}
+
+double trace_func(const Vector &x)
+{
+    DenseMatrix K;
+    tensor_func(x, K);
+    return K.Trace();
+}
+
+double rand_contrast_func(Vector &x)
+{
+    const int dim = x.Size();
+    SA_ASSERT(2 == dim || 3 == dim);
+
+    const int num_blocks = 32; // must divide nxy
+    const double eps = 1e-12;
+
+    int ix = static_cast<int>(std::floor((x(0) + eps) * num_blocks));
+    int iy = static_cast<int>(std::floor((x(1) + eps) * num_blocks));
+
+    ix = std::max(0, std::min(ix, num_blocks - 1));
+    iy = std::max(0, std::min(iy, num_blocks - 1));
+
+    const unsigned int u_ix = static_cast<unsigned int>(ix);
+    const unsigned int u_iy = static_cast<unsigned int>(iy);
+
+    unsigned int seed = (u_ix * 73856093u) ^ (u_iy * 19349663u);
+
+    if (3 == dim)
+    {
+        int iz = static_cast<int>(std::floor((x(2) + eps) * num_blocks));
+        iz = std::max(0, std::min(iz, num_blocks - 1));
+        const unsigned int u_iz = static_cast<unsigned int>(iz);
+        seed ^= (u_iz * 83492791u);
+    }
+
+    std::mt19937 gen(seed);
+    // std::uniform_int_distribution<int> dist(0, 6);
+    std::uniform_real_distribution<double> dist(0.0, 1.0);
+
+    // const int exponent = dist(gen);
+    const double val = dist(gen);
+    const int exponent = (val < 0.15) ? 6 : 0;
+
+    return std::pow(10.0, static_cast<double>(exponent));
+}
+
+double checkboard_func(Vector &x)
+{
+    const int dim = x.Size();
+    SA_ASSERT(2 == dim || 3 == dim);
+
+    const int num_blocks = 8; // must divide nxy
+    const double eps = 1e-12;
+
+    int ix = static_cast<int>(std::floor((x(0) + eps) * num_blocks));
+    int iy = static_cast<int>(std::floor((x(1) + eps) * num_blocks));
+
+    ix = std::max(0, std::min(ix, num_blocks - 1));
+    iy = std::max(0, std::min(iy, num_blocks - 1));
+
+    int parity = ix + iy;
+
+    if (3 == dim)
+    {
+        int iz = static_cast<int>(std::floor((x(2) + eps) * num_blocks));
+        iz = std::max(0, std::min(iz, num_blocks - 1));
+        parity += iz;
+    }
+
+    return (0 == parity % 2) ? 1e6 : 1e0;
 }
 
 void print_mises_info(const agg_partitioning_relations_t &agg_part_rels);
@@ -265,6 +369,18 @@ int main(int argc, char *argv[])
     FunctionCoefficient sol(sol_func);
     FunctionCoefficient rhs(rhs_func);
     ConstantCoefficient conduct(1.0);
+    // FunctionCoefficient conduct(checkboard_func);
+    // FunctionCoefficient conduct(rotated_channel_func);
+    // MatrixFunctionCoefficient conduct(dim, tensor_func);
+    // FunctionCoefficient trace(trace_func);
+
+    L2_FECollection cfec(0, dim);
+    ParFiniteElementSpace cfes(&pmesh, &cfec);
+    ParGridFunction conduct_gf(&cfes);
+    conduct_gf.ProjectCoefficient(conduct);
+    // conduct_gf.ProjectCoefficient(trace);
+    if (visualize)
+        fem_parallel_visualize_gf(pmesh, conduct_gf);
 
     Array<int> ess_bdr(pmesh.bdr_attributes.Max());
     ess_bdr = 1;
