@@ -438,7 +438,7 @@ void tg_assemble_and_smooth(HypreParMatrix &Ag,
     SA_ASSERT(tg_data.interp->GetGlobalNumCols() ==
               tg_data.restr->GetGlobalNumRows());
 
-    const int num_fine_dofs = agg_part_rels.ND;
+    const int num_fine_dofs = tg_data.interp->GetGlobalNumRows();
     const int num_coarse_dofs = tg_data.interp->GetGlobalNumCols();
     SA_RPRINTF_NOTS(0, "            coarse space dimension: %d\n", num_coarse_dofs);
     const double grid_complexity = (num_fine_dofs + num_coarse_dofs) / (double)num_fine_dofs;
