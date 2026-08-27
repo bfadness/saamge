@@ -264,7 +264,7 @@ int main(int argc, char *argv[])
 
     FunctionCoefficient sol(sol_func);
     FunctionCoefficient rhs(rhs_func);
-    ConstantCoefficient conduct_func(1.0);
+    ConstantCoefficient conduct(1.0);
 
     Array<int> ess_bdr(pmesh.bdr_attributes.Max());
     ess_bdr = 1;
@@ -280,7 +280,7 @@ int main(int argc, char *argv[])
     b.Assemble();
 
     ParBilinearForm a(&fes);
-    a.AddDomainIntegrator(new mfem::DiffusionIntegrator(conduct_func));
+    a.AddDomainIntegrator(new mfem::DiffusionIntegrator(conduct));
     a.Assemble();
 
     const bool keep_diag = true;
