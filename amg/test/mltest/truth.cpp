@@ -443,7 +443,7 @@ int main(int argc, char *argv[])
     x.Save(sol_ofs);
     sol_ofs.close();
 
-/********************************************************************************/
+//////////////////////////////////////////////////////////////////////////////////////////////
 
     // AMGe code begins here
     std::vector<int> element_agglomerate;
@@ -498,7 +498,7 @@ int main(int argc, char *argv[])
     x.ProjectBdrCoefficient(bdr_coeff, ess_bdr);
     x.GetTrueDofs(*X);
 
-/********************************************************************************/
+//////////////////////////////////////////////////////////////////////////////////////////////
 
     const int iter = tg_run(*A, agg_part_rels, *X, *B, max_iter,
         rel_tol, 0.0, 1.0, level->tg_data, false);
@@ -515,7 +515,7 @@ int main(int argc, char *argv[])
     x.Save(sol_ofs);
     sol_ofs.close();
 
-/********************************************************************************/
+//////////////////////////////////////////////////////////////////////////////////////////////
 
     x.Randomize(seed);
     x.ProjectBdrCoefficient(bdr_coeff, ess_bdr);
