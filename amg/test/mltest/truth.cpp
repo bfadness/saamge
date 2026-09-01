@@ -347,7 +347,7 @@ int main(int argc, char *argv[])
     for (int i=0; i<times_refine; ++i)
         pmesh.UniformRefinement();
 
-    H1_FECollection fec(order, dim);
+    L2_FECollection fec(order, dim);
     ParFiniteElementSpace fes(&pmesh, &fec);
 
     const int pNV = pmesh.GetNV();
@@ -389,18 +389,21 @@ int main(int argc, char *argv[])
     FunctionCoefficient bdr_coeff(bdr_cond);
     const int seed = 0;
     x.Randomize(seed);
-    x.ProjectBdrCoefficient(bdr_coeff, ess_bdr);
+
+    const int kappa = (order + 1) * (order + dim);
+    const int sigma = -1.0;
 
     ParLinearForm b(&fes);
     b.AddDomainIntegrator(new DomainLFIntegrator(rhs));
+    b.AddBdrFaceIntegrator(
+        new DGDirichletLFIntegrator(bdr_coeff, sigma, kappa), ess_bdr);
     b.Assemble();
 
     ParBilinearForm a(&fes);
     a.AddDomainIntegrator(new DiffusionIntegrator(conduct));
+    a.AddInteriorFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa));
+    a.AddBdrFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa), ess_bdr);
     a.Assemble();
-
-    const bool keep_diag = true;
-    a.EliminateEssentialBC(ess_bdr, x, b, keep_diag);
     a.Finalize();
 
 /*
@@ -495,7 +498,6 @@ int main(int argc, char *argv[])
 
     // reset the values in X
     x.Randomize(seed);
-    x.ProjectBdrCoefficient(bdr_coeff, ess_bdr);
     x.GetTrueDofs(*X);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -518,7 +520,6 @@ int main(int argc, char *argv[])
 //////////////////////////////////////////////////////////////////////////////////////////////
 
     x.Randomize(seed);
-    x.ProjectBdrCoefficient(bdr_coeff, ess_bdr);
     x.GetTrueDofs(*X);
 
     Solver *amge = new VCycleSolver(level->tg_data, false); // interactive_mode
