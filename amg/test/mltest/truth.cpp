@@ -360,7 +360,6 @@ int main(int argc, char *argv[])
     SA_PRINTF("gNE: %d, gND: %d\n", gNE, gND);
     SA_PRINTF("pNE: %d, pND: %d\n", pNE, pND);
 
-
     std::ostringstream mesh_name;
     mesh_name << "mesh." << std::setfill('0') << std::setw(6) << myid;
     std::ofstream mesh_ofs(mesh_name.str().c_str());
@@ -397,7 +396,7 @@ int main(int argc, char *argv[])
     b.Assemble();
 
     ParBilinearForm a(&fes);
-    a.AddDomainIntegrator(new mfem::DiffusionIntegrator(conduct));
+    a.AddDomainIntegrator(new DiffusionIntegrator(conduct));
     a.Assemble();
 
     const bool keep_diag = true;
