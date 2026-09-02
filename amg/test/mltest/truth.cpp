@@ -543,6 +543,7 @@ int main(int argc, char *argv[])
     x.Save(sol_ofs);
     sol_ofs.close();
 
+    delete amge;
     ml_free_data(ml_data);
     agg_free_partitioning(agg_part_rels);
     delete []nparts_arr;
