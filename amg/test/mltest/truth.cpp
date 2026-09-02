@@ -5,7 +5,6 @@
 #include <mpi.h>
 #include <numeric>   // std::accumulate
 #include <random>    // std::mt19937
-#include <vector>    // std::vector
 
 #include "saamge.hpp"
 
@@ -148,8 +147,7 @@ void print_mises_info(const agg_partitioning_relations_t &agg_part_rels);
 agg_partitioning_relations_t *
 fem_create_test_partitioning(HypreParMatrix &A, ParFiniteElementSpace &fes,
                              const agg_dof_status_t *bdr_dofs, int *nparts,
-                             bool do_aggregates,
-                             std::vector<int> &element_agglomerate)
+                             bool do_aggregates)
 {
     Mesh *mesh = fes.GetMesh();
 
@@ -157,49 +155,61 @@ fem_create_test_partitioning(HypreParMatrix &A, ParFiniteElementSpace &fes,
     Table *elem_to_elem = mbox_copy_table(&(mesh->ElementToElementTable()));
     Table *elem_to_dof = mbox_copy_table(&(fes.GetElementToDofTable()));
 
+    int *element_agglomerate = nullptr;
     // indices below are all local and not global
-    if (1 == PROC_NUM)
-        element_agglomerate = {0, 0, 1, 1, 0, 0, 2, 2, 3, 3, 3, 2};
-    else if (2 == PROC_NUM && 0 == PROC_RANK)
-        element_agglomerate = {0, 0, 1, 1, 0, 0};
-    else if (2 == PROC_NUM && 1 == PROC_RANK)
-        element_agglomerate = {0, 0, 1, 1, 1, 0};
-    else if (4 == PROC_NUM)
+    // 12 == mesh->GetNE();
+    switch (PROC_NUM)
     {
-        // the nested ternary operators here suck,
-        // but they reduce eyes glazing over
-        int num_elem = (0 == PROC_RANK) ? 4 : (1 == PROC_RANK) ? 2 : 3;
-        element_agglomerate.assign(num_elem, 0);
+        case 1:
+            element_agglomerate = new int[12]{0, 0, 1, 1, 0, 0, 2, 2, 3, 3, 3, 2};
+            break;
+        case 2:
+            if (0 == PROC_RANK)
+                element_agglomerate = new int[6]{0, 0, 1, 1, 0, 0};
+            else if (1 == PROC_RANK)
+                element_agglomerate = new int[6]{0, 0, 1, 1, 1, 0};
+            break;
+        case 4:
+        {
+            // the nested ternary operators here suck,
+            // but they reduce eyes glazing over
+            int num_elem = (0 == PROC_RANK) ? 4 : (1 == PROC_RANK) ? 2 : 3;
+            element_agglomerate = new int[num_elem]();
+            break;
+        }
+        default:
+            SA_ASSERT(false);
+            break;
     }
-    else
-        SA_ASSERT(false);
 
     // bdr_dofs is only used as info to copy onto coarser level
     // it does not actually affect partitioning
     agg_partitioning_relations_t *agg_part_rels =
         agg_create_partitioning_fine(A, fes.GetNE(), elem_to_dof, elem_to_elem,
-                                     element_agglomerate.data(), bdr_dofs, nparts,
+                                     element_agglomerate, bdr_dofs, nparts,
                                      fes.Dof_TrueDof_Matrix(), do_aggregates, true);
     SA_ASSERT(agg_part_rels);
     return agg_part_rels;
 }
 
 // Create the element to process index array for the serial mesh
-std::vector<int> fem_partition_test_mesh(Mesh &mesh)
+int *fem_partition_test_mesh(Mesh &mesh)
 {
     SA_RPRINTF_NOTS(0, "Using the test mesh with %d processes\n", PROC_NUM);
     const int num_elements = mesh.GetNE();
-    std::vector<int> element_process;
-    element_process.reserve(num_elements);
-    if (1 == PROC_NUM)
-        std::fill(element_process.begin(), element_process.end(), 0);
-    else if (4 == PROC_NUM)
-        element_process = {0, 0, 1, 1, 0, 0, 2, 2, 3, 3, 3, 2};
-    else if (2 == PROC_NUM)
-        element_process = {0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1};
-    else
-        SA_ASSERT(false);
-    return element_process;
+
+    switch (PROC_NUM)
+    {
+        case 1:
+            return new int[num_elements]();
+        case 2:
+            return new int[num_elements]{0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1};
+        case 4:
+            return new int[num_elements]{0, 0, 1, 1, 0, 0, 2, 2, 3, 3, 3, 2};
+        default:
+            SA_ASSERT(false);
+            return nullptr;
+    }
 }
 
 int main(int argc, char *argv[])
@@ -331,18 +341,14 @@ int main(int argc, char *argv[])
         }
     }
 
-    std::vector<int> proc_partitioning;
-    int *raw_ptr = nullptr;
+    int *proc_partitioning = nullptr;
     if (mltest)
         proc_partitioning = fem_partition_test_mesh(*mesh);
     else
-    {
-        raw_ptr = fem_partition_mesh(*mesh, &nprocs);
-        proc_partitioning.assign(raw_ptr, raw_ptr + mesh->GetNE());
-    }
-    ParMesh pmesh(active_comm, *mesh, proc_partitioning.data());
-    delete []raw_ptr;
+        proc_partitioning = fem_partition_mesh(*mesh, &nprocs);
+    ParMesh pmesh(active_comm, *mesh, proc_partitioning);
     delete mesh;
+    delete []proc_partitioning;
 
     for (int i=0; i<times_refine; ++i)
         pmesh.UniformRefinement();
@@ -357,7 +363,7 @@ int main(int argc, char *argv[])
     const int gND = fes.GlobalTrueVSize();
 
     SA_RPRINTF_NOTS(0, "<<<< %d agglomerates\n", pNE / first_elems_per_agg);
-    SA_PRINTF("gNE: %d, gND: %d\n", gNE, gND);
+    SA_RPRINTF_NOTS(0, "gNE: %d, gND: %d\n", gNE, gND);
     SA_PRINTF("pNE: %d, pND: %d\n", pNE, pND);
 
     std::ostringstream mesh_name;
@@ -449,7 +455,6 @@ int main(int argc, char *argv[])
 //////////////////////////////////////////////////////////////////////////////////////////////
 
     // AMGe code begins here
-    std::vector<int> element_agglomerate;
     int *nparts_arr = new int[num_levels-1];
     const bool do_aggregates_here = do_aggregates && (num_levels == 2);
     agg_dof_status_t *bdr_dofs = fem_find_bdr_dofs(fes, &ess_bdr);
@@ -459,8 +464,7 @@ int main(int argc, char *argv[])
         nparts_arr[0] = 4/PROC_NUM;
         SA_RPRINTF_NOTS(0, "%s", "Get the agglomerate test mesh partition relations\n");
         agg_part_rels = fem_create_test_partitioning(
-            *A, fes, bdr_dofs, nparts_arr,
-            do_aggregates_here, element_agglomerate);
+            *A, fes, bdr_dofs, nparts_arr, do_aggregates_here);
     }
     else
     {
@@ -540,8 +544,8 @@ int main(int argc, char *argv[])
     x.Save(sol_ofs);
     sol_ofs.close();
 
+    delete amge;
     ml_free_data(ml_data);
-    agg_part_rels->partitioning = nullptr; // prevent double free of element_agglomerate
     agg_free_partitioning(agg_part_rels);
     delete []nparts_arr;
 
