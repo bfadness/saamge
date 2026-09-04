@@ -14,127 +14,22 @@ using namespace saamge;
 using std::endl;
 double tau(2*M_PI);
 
-double sol_func(Vector &x)
+void sol_func(const Vector &x, Vector &u)
 {
-    // const double xi(x(0));
-    // const double xj(x(1));
-    // return sin(tau*xi) * sin(tau*xj);
-    return 0.0;
+    u.SetSize(x.Size());
+    u(0) = 0.0;
+    u(1) = 0.0;
+    if (3 == x.Size())
+        u(2) = 0.0;
 }
 
-double rhs_func(Vector &x)
+void rhs_func(const Vector &x, Vector &f)
 {
-    SA_ASSERT(2 == x.Size());
-    // return 2*pow(tau, 2) * sol_func(x);
-    return 0.0;
-}
-
-double bdr_cond(Vector &x)
-{
-    SA_ASSERT(2 == x.Size());
-    return 0.0;
-}
-
-void tensor_func(const Vector &x, DenseMatrix &K)
-{
-    const int dim = x.Size();
-    SA_ASSERT(2 == dim || 3 == dim);
-
-    K.SetSize(dim);
-
-    double b[3];
-    const double theta = 2.0 * M_PI * (x(0) + x(1));
-    b[0] = std::cos(theta);
-    b[1] = std::sin(theta);
-    if (3 == dim)
-    {
-        const double phi = M_PI * x(2);
-        b[0] *= std::sin(phi);
-        b[1] *= std::sin(phi);
-        b[2] = std::cos(phi);
-    }
-    // norm squared gives magnitude for anisotropy ratio
-    const double norm = 1e2;
-    for (int i = 0; i < dim; ++i)
-        b[i] *= norm;
-
-    for (int i = 0; i < dim; ++i)
-    {
-        for (int j = 0; j < dim; ++j)
-            K(i, j) = b[i] * b[j];
-        K(i, i) += 1.0;
-    }
-}
-
-double trace_func(const Vector &x)
-{
-    DenseMatrix K;
-    tensor_func(x, K);
-    return K.Trace();
-}
-
-double rand_contrast_func(Vector &x)
-{
-    const int dim = x.Size();
-    SA_ASSERT(2 == dim || 3 == dim);
-
-    const int num_blocks = 32; // must divide nxy
-    const double eps = 1e-12;
-
-    int ix = static_cast<int>(std::floor((x(0) + eps) * num_blocks));
-    int iy = static_cast<int>(std::floor((x(1) + eps) * num_blocks));
-
-    ix = std::max(0, std::min(ix, num_blocks - 1));
-    iy = std::max(0, std::min(iy, num_blocks - 1));
-
-    const unsigned int u_ix = static_cast<unsigned int>(ix);
-    const unsigned int u_iy = static_cast<unsigned int>(iy);
-
-    unsigned int seed = (u_ix * 73856093u) ^ (u_iy * 19349663u);
-
-    if (3 == dim)
-    {
-        int iz = static_cast<int>(std::floor((x(2) + eps) * num_blocks));
-        iz = std::max(0, std::min(iz, num_blocks - 1));
-        const unsigned int u_iz = static_cast<unsigned int>(iz);
-        seed ^= (u_iz * 83492791u);
-    }
-
-    std::mt19937 gen(seed);
-    // std::uniform_int_distribution<int> dist(0, 6);
-    std::uniform_real_distribution<double> dist(0.0, 1.0);
-
-    // const int exponent = dist(gen);
-    const double val = dist(gen);
-    const int exponent = (val < 0.15) ? 6 : 0;
-
-    return std::pow(10.0, static_cast<double>(exponent));
-}
-
-double checkboard_func(Vector &x)
-{
-    const int dim = x.Size();
-    SA_ASSERT(2 == dim || 3 == dim);
-
-    const int num_blocks = 8; // must divide nxy
-    const double eps = 1e-12;
-
-    int ix = static_cast<int>(std::floor((x(0) + eps) * num_blocks));
-    int iy = static_cast<int>(std::floor((x(1) + eps) * num_blocks));
-
-    ix = std::max(0, std::min(ix, num_blocks - 1));
-    iy = std::max(0, std::min(iy, num_blocks - 1));
-
-    int parity = ix + iy;
-
-    if (3 == dim)
-    {
-        int iz = static_cast<int>(std::floor((x(2) + eps) * num_blocks));
-        iz = std::max(0, std::min(iz, num_blocks - 1));
-        parity += iz;
-    }
-
-    return (0 == parity % 2) ? 1e6 : 1e0;
+    f.SetSize(x.Size());
+    f(0) = 0.0;
+    f(1) = 0.0;
+    if (3 == x.Size())
+        f(2) = 0.0;
 }
 
 void print_mises_info(const agg_partitioning_relations_t &agg_part_rels);
@@ -153,7 +48,8 @@ fem_create_test_partitioning(HypreParMatrix &A, ParFiniteElementSpace &fes,
 
     // the following two tables stay allocated until the end of main
     Table *elem_to_elem = mbox_copy_table(&(mesh->ElementToElementTable()));
-    Table *elem_to_dof = mbox_copy_table(&(fes.GetElementToDofTable()));
+    Table *elem_to_dof = vector_valued_elem_to_dof(
+        fes.GetElementToDofTable(), fes.GetVDim(), fes.GetOrdering());
 
     int *element_agglomerate = nullptr;
     // indices below are all local and not global
@@ -285,7 +181,7 @@ int main(int argc, char *argv[])
     args.AddOption(&do_aggregates, "-agg", "--do-aggregates",
                    "-nagg", "--no-do-aggregates",
                    "On coarsest level, use aggregates instead of MISes for lower complexity.");
-    bool elasticity = false;
+    bool elasticity = true;
     bool identity_partition = false;
     bool adapt = false;
     args.AddOption(&adapt, "-ad", "--adapt",
@@ -354,7 +250,7 @@ int main(int argc, char *argv[])
         pmesh.UniformRefinement();
 
     H1_FECollection fec(order, dim);
-    ParFiniteElementSpace fes(&pmesh, &fec);
+    ParFiniteElementSpace fes(&pmesh, &fec, dim, Ordering::byVDIM);
 
     const int pNV = pmesh.GetNV();
     const int pNE = pmesh.GetNE();
@@ -372,37 +268,31 @@ int main(int argc, char *argv[])
     mesh_ofs.precision(8);
     pmesh.Print(mesh_ofs);
 
-    FunctionCoefficient sol(sol_func);
-    FunctionCoefficient rhs(rhs_func);
-    ConstantCoefficient conduct(1.0);
-    // FunctionCoefficient conduct(checkboard_func);
-    // FunctionCoefficient conduct(rotated_channel_func);
-    // MatrixFunctionCoefficient conduct(dim, tensor_func);
-    // FunctionCoefficient trace(trace_func);
-
-    L2_FECollection cfec(0, dim);
-    ParFiniteElementSpace cfes(&pmesh, &cfec);
-    ParGridFunction conduct_gf(&cfes);
-    conduct_gf.ProjectCoefficient(conduct);
-    // conduct_gf.ProjectCoefficient(trace);
-    if (visualize)
-        fem_parallel_visualize_gf(pmesh, conduct_gf);
-
     Array<int> ess_bdr(pmesh.bdr_attributes.Max());
     ess_bdr = 1;
 
     ParGridFunction x(&fes);
-    FunctionCoefficient bdr_coeff(bdr_cond);
+    VectorFunctionCoefficient sol(dim, sol_func);
     const int seed = 0;
     x.Randomize(seed);
-    x.ProjectBdrCoefficient(bdr_coeff, ess_bdr);
+    fes.BuildDofToArrays();
+    Array<int> ess_vdof_marker, ess_vdof_list;
+    fes.GetEssentialVDofs(ess_bdr, ess_vdof_marker);
+    FiniteElementSpace::MarkerToList(ess_vdof_marker, ess_vdof_list);
+    ess_vdof_list.Print();
+    // x.ProjectCoefficient(sol, ess_vdof_list);
+    x.ProjectCoefficient(sol);
+    cout << "Are we okay here?" << endl;
 
+    VectorFunctionCoefficient rhs(dim, rhs_func);
     ParLinearForm b(&fes);
-    b.AddDomainIntegrator(new DomainLFIntegrator(rhs));
+    b.AddDomainIntegrator(new VectorDomainLFIntegrator(rhs));
     b.Assemble();
 
+    ConstantCoefficient mu(1.0);
+    ConstantCoefficient lambda(1.0);
     ParBilinearForm a(&fes);
-    a.AddDomainIntegrator(new DiffusionIntegrator(conduct));
+    a.AddDomainIntegrator(new ElasticityIntegrator(lambda, mu));
     a.Assemble();
 
     const bool keep_diag = true;
@@ -449,6 +339,8 @@ int main(int argc, char *argv[])
     x.Save(sol_ofs);
     sol_ofs.close();
 
+    return 0;
+
 //////////////////////////////////////////////////////////////////////////////////////////////
 
     // AMGe code begins here
@@ -488,7 +380,7 @@ int main(int argc, char *argv[])
         !direct_eigensolver, do_aggregates);
     mlp.set_use_double_cycle(double_cycle);
     mlp.set_coarse_direct(coarse_direct);
-    if (linear_coarse)
+    if (linear_coarse || elasticity)
         mlp.set_polynomial_coarse_space(0, 1);
 
     ml_data_t *ml_data(ml_produce_data(*A, agg_part_rels, emp, mlp));
@@ -499,7 +391,7 @@ int main(int argc, char *argv[])
 
     // reset the values in X
     x.Randomize(seed);
-    x.ProjectBdrCoefficient(bdr_coeff, ess_bdr);
+    x.ProjectCoefficient(sol, ess_vdof_list);
     x.GetTrueDofs(*X);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -522,7 +414,7 @@ int main(int argc, char *argv[])
 //////////////////////////////////////////////////////////////////////////////////////////////
 
     x.Randomize(seed);
-    x.ProjectBdrCoefficient(bdr_coeff, ess_bdr);
+    x.ProjectCoefficient(sol, ess_vdof_list);
     x.GetTrueDofs(*X);
 
     Solver *amge = new VCycleSolver(level->tg_data, false); // interactive_mode
