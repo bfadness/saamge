@@ -1378,6 +1378,7 @@ void ContribTent::contrib_composite(
     DenseMatrix * const *cut_evects_arr, int polynomial_order,
     int spatial_dimension, int num_nodes, const Vector& coords)
 {
+    SA_RPRINTF_NOTS(0, "%s", "        --> contrib_composite\n");
     const bool scaling_P = false;
 
     SharedEntityCommunication<DenseMatrix> sec(PROC_COMM,
