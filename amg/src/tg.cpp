@@ -452,6 +452,7 @@ void tg_build_hierarchy_with_polynomial(
     ElementMatrixProvider *elem_data, int polynomial_order, bool use_spectral,
     bool avoid_ess_bdr_dofs)
 {
+    SA_RPRINTF_NOTS(0, "%s", "--> tg_build_hierarchy_with_polynomial\n");
     delete tg_data.ltent_interp;
     delete tg_data.tent_interp;
 

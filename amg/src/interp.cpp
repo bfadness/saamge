@@ -806,13 +806,14 @@ SparseMatrix * interp_build_composite(
     int spatial_dimension, int num_nodes, const Vector& coords, int order,
     bool avoid_ess_bdr_dofs, bool use_spectral)
 {
+    SA_RPRINTF_NOTS(0, "%s", "    --> interp_build_composite\n");
     const double tol = 0.0; // ? for readapting or something
     bool *xbad_lin_indep = NULL; // TODO const
     bool *vector_added = NULL; // TODO const
     const Vector *xbad = NULL;
     const bool transf = false;
     const bool readapting = false;
-    const bool all_eigens = false;
+    const bool all_eigens = true;
     const bool spect_update = true;
 
     // this fills interp_data.cut_evects_arr
