@@ -14,25 +14,16 @@ using namespace saamge;
 using std::endl;
 double tau(2*M_PI);
 
-double sol_func(Vector &x)
+void sol_func(const Vector &x, Vector &u)
 {
-    // const double xi(x(0));
-    // const double xj(x(1));
-    // return sin(tau*xi) * sin(tau*xj);
-    return 0.0;
+    u.SetSize(x.Size());
+    u = 0.0;
 }
 
-double rhs_func(Vector &x)
+void rhs_func(const Vector &x, Vector &f)
 {
-    SA_ASSERT(2 == x.Size());
-    // return 2*pow(tau, 2) * sol_func(x);
-    return 0.0;
-}
-
-double bdr_cond(Vector &x)
-{
-    SA_ASSERT(2 == x.Size());
-    return 0.0;
+    f.SetSize(x.Size());
+    f = 0.0;
 }
 
 void tensor_func(const Vector &x, DenseMatrix &K)
@@ -153,7 +144,8 @@ fem_create_test_partitioning(HypreParMatrix &A, ParFiniteElementSpace &fes,
 
     // the following two tables stay allocated until the end of main
     Table *elem_to_elem = mbox_copy_table(&(mesh->ElementToElementTable()));
-    Table *elem_to_dof = mbox_copy_table(&(fes.GetElementToDofTable()));
+    Table *elem_to_dof = vector_valued_elem_to_dof(
+        fes.GetElementToDofTable(), fes.GetVDim(), fes.GetOrdering());
 
     int *element_agglomerate = nullptr;
     // indices below are all local and not global
@@ -285,7 +277,7 @@ int main(int argc, char *argv[])
     args.AddOption(&do_aggregates, "-agg", "--do-aggregates",
                    "-nagg", "--no-do-aggregates",
                    "On coarsest level, use aggregates instead of MISes for lower complexity.");
-    bool elasticity = false;
+    bool elasticity = true;
     bool identity_partition = false;
     bool adapt = false;
     args.AddOption(&adapt, "-ad", "--adapt",
@@ -354,7 +346,7 @@ int main(int argc, char *argv[])
         pmesh.UniformRefinement();
 
     H1_FECollection fec(order, dim);
-    ParFiniteElementSpace fes(&pmesh, &fec);
+    ParFiniteElementSpace fes(&pmesh, &fec, dim, Ordering::byVDIM);
 
     const int pNV = pmesh.GetNV();
     const int pNE = pmesh.GetNE();
@@ -372,8 +364,6 @@ int main(int argc, char *argv[])
     mesh_ofs.precision(8);
     pmesh.Print(mesh_ofs);
 
-    FunctionCoefficient sol(sol_func);
-    FunctionCoefficient rhs(rhs_func);
     ConstantCoefficient conduct(1.0);
     // FunctionCoefficient conduct(checkboard_func);
     // FunctionCoefficient conduct(rotated_channel_func);
@@ -392,17 +382,24 @@ int main(int argc, char *argv[])
     ess_bdr = 1;
 
     ParGridFunction x(&fes);
-    FunctionCoefficient bdr_coeff(bdr_cond);
     const int seed = 0;
     x.Randomize(seed);
-    x.ProjectBdrCoefficient(bdr_coeff, ess_bdr);
+    fes.BuildDofToArrays();
+    Array<int> ess_vdof_marker, ess_vdof_list;
+    fes.GetEssentialVDofs(ess_bdr, ess_vdof_marker);
+    FiniteElementSpace::MarkerToList(ess_vdof_marker, ess_vdof_list);
+    for (int vdof : ess_vdof_list)
+        x[vdof] = 0.0;
 
+    VectorFunctionCoefficient rhs(dim, rhs_func);
     ParLinearForm b(&fes);
-    b.AddDomainIntegrator(new DomainLFIntegrator(rhs));
+    b.AddDomainIntegrator(new VectorDomainLFIntegrator(rhs));
     b.Assemble();
 
+    double q_mu(1.0);
+    double q_lambda(1.0);
     ParBilinearForm a(&fes);
-    a.AddDomainIntegrator(new DiffusionIntegrator(conduct));
+    a.AddDomainIntegrator(new ElasticityIntegrator(conduct, q_lambda, q_mu));
     a.Assemble();
 
     const bool keep_diag = true;
@@ -424,6 +421,7 @@ int main(int argc, char *argv[])
     std::unique_ptr<HypreParMatrix> A(a.ParallelAssemble());
 
     HypreBoomerAMG amg(*A);
+    amg.SetSystemsOptions(dim);
     amg.SetPrintLevel(0);
 
     // use the same tolerance for all conjugate gradient runs
@@ -439,6 +437,7 @@ int main(int argc, char *argv[])
     pcg.Mult(*B, *X);
     x.Distribute(*X);
 
+    VectorFunctionCoefficient sol(dim, sol_func);
     double error = x.ComputeL2Error(sol);
     SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %12.5e\n\n", error);
 
@@ -488,7 +487,7 @@ int main(int argc, char *argv[])
         !direct_eigensolver, do_aggregates);
     mlp.set_use_double_cycle(double_cycle);
     mlp.set_coarse_direct(coarse_direct);
-    if (linear_coarse)
+    if (linear_coarse || elasticity)
         mlp.set_polynomial_coarse_space(0, 1);
 
     ml_data_t *ml_data(ml_produce_data(*A, agg_part_rels, emp, mlp));
@@ -499,7 +498,8 @@ int main(int argc, char *argv[])
 
     // reset the values in X
     x.Randomize(seed);
-    x.ProjectBdrCoefficient(bdr_coeff, ess_bdr);
+    for (int vdof : ess_vdof_list)
+        x[vdof] = 0.0;
     x.GetTrueDofs(*X);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -522,7 +522,8 @@ int main(int argc, char *argv[])
 //////////////////////////////////////////////////////////////////////////////////////////////
 
     x.Randomize(seed);
-    x.ProjectBdrCoefficient(bdr_coeff, ess_bdr);
+    for (int vdof : ess_vdof_list)
+        x[vdof] = 0.0;
     x.GetTrueDofs(*X);
 
     Solver *amge = new VCycleSolver(level->tg_data, false); // interactive_mode
