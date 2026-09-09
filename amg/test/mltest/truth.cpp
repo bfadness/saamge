@@ -13,17 +13,32 @@ using namespace saamge;
 
 using std::endl;
 double tau(2*M_PI);
+double q_mu(1.0);
+double q_lambda(1.0);
 
 void sol_func(const Vector &x, Vector &u)
 {
-    u.SetSize(x.Size());
-    u = 0.0;
+    const double px = x(0) * (1.0 - x(0));
+    const double py = x(1) * (1.0 - x(1));
+
+    u.SetSize(2);
+    u(0) = px * py;
+    u(1) = u(0);
 }
 
 void rhs_func(const Vector &x, Vector &f)
 {
-    f.SetSize(x.Size());
-    f = 0.0;
+    const double xi = x(0);
+    const double xj = x(1);
+
+    const double grad_div_xi = 1.0 - 2.0*xi - 4.0*xj + 4.0*xi*xj + 2.0*xj*xj;
+    const double grad_div_xj = 1.0 - 4.0*xi - 2.0*xj + 4.0*xi*xj + 2.0*xi*xi;
+
+    const double laplacian = -2.0*xi + 2.0*xi*xi - 2.0*xj + 2.0*xj*xj;
+
+    f.SetSize(2);
+    f(0) = -(q_lambda + q_mu) * grad_div_xi - q_mu * laplacian;
+    f(1) = -(q_lambda + q_mu) * grad_div_xj - q_mu * laplacian;
 }
 
 void tensor_func(const Vector &x, DenseMatrix &K)
@@ -382,22 +397,13 @@ int main(int argc, char *argv[])
     ess_bdr = 1;
 
     ParGridFunction x(&fes);
-    const int seed = 0;
-    x.Randomize(seed);
-    fes.BuildDofToArrays();
-    Array<int> ess_vdof_marker, ess_vdof_list;
-    fes.GetEssentialVDofs(ess_bdr, ess_vdof_marker);
-    FiniteElementSpace::MarkerToList(ess_vdof_marker, ess_vdof_list);
-    for (int vdof : ess_vdof_list)
-        x[vdof] = 0.0;
+    x = 0.0;
 
     VectorFunctionCoefficient rhs(dim, rhs_func);
     ParLinearForm b(&fes);
     b.AddDomainIntegrator(new VectorDomainLFIntegrator(rhs));
     b.Assemble();
 
-    double q_mu(1.0);
-    double q_lambda(1.0);
     ParBilinearForm a(&fes);
     a.AddDomainIntegrator(new ElasticityIntegrator(conduct, q_lambda, q_mu));
     a.Assemble();
@@ -497,9 +503,7 @@ int main(int argc, char *argv[])
     levels_level_t *level = levels_list_get_level(ml_data->levels_list, 0);
 
     // reset the values in X
-    x.Randomize(seed);
-    for (int vdof : ess_vdof_list)
-        x[vdof] = 0.0;
+    x = 0.0;
     x.GetTrueDofs(*X);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -521,9 +525,7 @@ int main(int argc, char *argv[])
 
 //////////////////////////////////////////////////////////////////////////////////////////////
 
-    x.Randomize(seed);
-    for (int vdof : ess_vdof_list)
-        x[vdof] = 0.0;
+    x = 0.0;
     x.GetTrueDofs(*X);
 
     Solver *amge = new VCycleSolver(level->tg_data, false); // interactive_mode
