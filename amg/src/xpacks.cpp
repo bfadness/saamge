@@ -416,8 +416,6 @@ double xpack_cut_evects_small(const Vector& evals, const DenseMatrix& evects,
     const int evals_sz = evals.Size();
     const int height = evects.Height();
     int i;
-    double skipped = 0.0;
-    bool all_skipped = false;
 
     if (SA_IS_OUTPUT_LEVEL(9))
     {
@@ -429,24 +427,32 @@ double xpack_cut_evects_small(const Vector& evals, const DenseMatrix& evects,
         PROC_CLEAR_STR_STREAM;
     }
 
-    // evals(i-1) is kept, and evals(i) is skipped
-    for (i = 0; i < evals_sz && evals(i) <= bound; ++i);
+    int start_index = 0;
+    // determine the number of elasticity rigid-body modes
+    // there are at most three (six) for dimension two (three)
+    while (evals(start_index) < 0.0)
+        ++start_index;
 
-    // all nonzero eigenvalues were skipped, so keep the smallest one
-    if (0 == i)
-    {
-        all_skipped = true;
-        i = 1;
-    }
+    i = start_index;
+    while (i < evals_sz && evals(i) <= bound)
+        ++i;
 
-    SA_PRINTF_L(9, "cut_evects cuts: %d, takes: %d, total: %d\n", evals_sz-i,
-                i, evals_sz);
+    // evals(i) is the first skipped eigenvalue
+    // evals(start_index) through evals(i-1) are kept
+    const int num_kept = i - start_index;
 
     SA_ASSERT(i <= evects.Width() && evects.Width() == evals_sz);
+    // we need to set the size even if num_kept = 0
+    cut_evects.SetSize(height, num_kept);
 
-    cut_evects.SetSize(height, i);
-    memcpy(cut_evects.Data(), evects.Data(), sizeof(double) * i * height);
+    // for elasticity, it is okay to keep zero eigenvectors
+    if (num_kept > 0)
+    {
+        const double *data_ptr = evects.Data() + (start_index * height);
+        memcpy(cut_evects.Data(), data_ptr, sizeof(double) * num_kept * height);
+    }
 
+    double skipped = 0.0;
     // all eigenvalues were kept, so ratio is not computed
     if (i == evals_sz)
     {
@@ -459,21 +465,26 @@ double xpack_cut_evects_small(const Vector& evals, const DenseMatrix& evects,
 
     if (agg_id < 10 || part % (agg_id / 10) == 0)
     {
-        const double eps = 1e-8;
         double ratio = -1.0;
-        // for evals(i-1) = 0, measure the relative gap instead of the ratio
-        if (evals(i-1) < eps)
+        switch (num_kept)
         {
-            ratio = evals(i) / evals(evals_sz-1);
-            SA_PRINTF_NOTS(" has gap measurement = %g\n", ratio);
-        }
-        else
-        {
-            ratio = evals(i) / evals(i-1);
-            SA_PRINTF_NOTS(" has spectral ratio = %g\n", ratio);
-            if (all_skipped)
-                SA_PRINTF_NOTS("%16sCPU %d: warning: theta %g < eigenvalue %g\n",
-                    "", PROC_RANK, bound, evals(i-1));
+            case 0:
+            {
+                SA_PRINTF_NOTS("\n%16sCPU %d: warning: bound %g < eigenvalue %g\n",
+                    "", PROC_RANK, bound, evals(start_index));
+                break;
+            }
+            case 1:
+            {
+                ratio = evals(i-1) / evals(evals_sz-1);
+                SA_PRINTF_NOTS(" has gap measurement = %g\n", ratio);
+                break;
+            }
+            default:
+            {
+                ratio = evals(i) / evals(i-1);
+                SA_PRINTF_NOTS(" has spectral ratio = %g\n", ratio);
+            }
         }
     }
     return skipped;
