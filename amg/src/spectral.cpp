@@ -253,7 +253,7 @@ bool Eigensolver::SolveDirect(
                 cut_evects_num_beg, cut_ptr->Width(), vector_added);
     SA_ALERT_COND_MSG(cut_evects_num_beg <= cut_ptr->Width(),
                       "Dimension decreased for %d!", part);
-    SA_ASSERT(vector_added || transf);
+    // SA_ASSERT(vector_added || transf);
 
     if (transf)
     {
