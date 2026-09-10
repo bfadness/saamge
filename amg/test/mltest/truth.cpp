@@ -369,7 +369,7 @@ int main(int argc, char *argv[])
     const int gNE = pmesh.GetGlobalNE();
     const int gND = fes.GlobalTrueVSize();
 
-    SA_RPRINTF_NOTS(0, "<<<< %d agglomerates\n", pNE / first_elems_per_agg);
+    SA_RPRINTF_NOTS(0, "<<<< %d agglomerates\n", gNE / first_elems_per_agg);
     SA_RPRINTF_NOTS(0, "gNE: %d, gND: %d\n", gNE, gND);
     SA_PRINTF("pNE: %d, pND: %d\n", pNE, pND);
 
