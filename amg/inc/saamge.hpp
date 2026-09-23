@@ -51,6 +51,7 @@
 #include <process.hpp>
 #include <smpr.hpp>
 #include <solve.hpp>
+#include <spe10.hpp>
 #include <spectral.hpp>
 #include <tg.hpp>
 #include <xpacks.hpp>
