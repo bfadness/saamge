@@ -152,13 +152,7 @@ double agg_assemble_value(int di, int dj, int part,
         {  // Dense matrix.
             SA_ASSERT(elmat->Width() == ndofs);
             SA_ASSERT(elmat->Height() == ndofs);
-#if (SA_IS_DEBUG_LEVEL(2))
-            SA_ALERT_COND_MSG(SA_IS_REAL_EQ((*elmat)(dii, djj),
-                                            (*elmat)(djj, dii)),
-                              "Non-symmetric element matrix!!! Difference: %g",
-                              (*elmat)(dii, djj) - (*elmat)(djj, dii));
-#endif
-            value += (*elmat)(dii, djj);
+            value += 0.5 * ((*elmat)(dii, djj) + (*elmat)(djj, dii));
             if (free_matr)
                 delete elmat;
         }
