@@ -4,6 +4,7 @@
 #include <mfem.hpp>
 #include <mpi.h>
 #include <numeric>   // std::accumulate
+#include <string>    // std::string
 #include <random>    // std::mt19937
 
 #include "saamge.hpp"
@@ -13,12 +14,6 @@ using namespace saamge;
 
 using std::endl;
 double tau(2*M_PI);
-
-void sol_func(const Vector &x, Vector &u)
-{
-    u.SetSize(x.Size());
-    u = 0.0;
-}
 
 void rhs_func(const Vector &x, Vector &f)
 {
@@ -147,9 +142,6 @@ int main(int argc, char *argv[])
     int first_elems_per_agg = -1;
     args.AddOption(&first_elems_per_agg, "-fe", "--first-elems-per-agg",
                    "Number of elements per AE for first (finest) coarsening.");
-    int nxy = 4;
-    args.AddOption(&nxy, "-nxy", "--num_elem_per_dim",
-                   "Generate 2D triangular mesh with this number of elements per side.");
     bool minimal_coarse = false;
     bool linear_coarse = false;
     args.AddOption(&linear_coarse, "-lc", "--linear-coarse",
@@ -207,16 +199,16 @@ int main(int argc, char *argv[])
                               // not mess up the parameters above
     bool mltest = false;
     Mesh *mesh;
-    if (nxy > 0)
-    {
-        mesh = new Mesh(nxy, nxy, Element::TRIANGLE, 1);
-    }
-    else
+    if (mltest)
     {
         mesh = fem_read_mesh(mesh_file);
         if (20 == mesh->GetNV() && 12 == mesh->GetNE() &&
             0 == times_refine && 2 == num_levels) // not very general...
             mltest = true;
+    }
+    else
+    {
+        mesh = new Mesh(60, 220, Element::QUADRILATERAL, 1, 1200.0, 2200.0);
     }
     SA_RPRINTF_NOTS(0, "<<<< bool mltest = %d\n", mltest);
     const int dim = mesh->Dimension();
@@ -262,26 +254,39 @@ int main(int argc, char *argv[])
     mesh_ofs.precision(8);
     pmesh.Print(mesh_ofs);
 
-    ConstantCoefficient conduct(1.0);
-    L2_FECollection cfec(0, dim);
-    ParFiniteElementSpace cfes(&pmesh, &cfec);
-    ParGridFunction conduct_gf(&cfes);
-    conduct_gf.ProjectCoefficient(conduct);
-    if (visualize)
-        fem_parallel_visualize_gf(pmesh, conduct_gf);
+    const std::string perm_file = "/Users/barry/src/forks/saamge/amg/data/spe_perm.dat";
+    PermeabilityCoefficient perm(active_comm, perm_file, PermeabilityCoefficient::XY, 49);
+
+    // export permeability_
+    std::vector<double> &permeability = perm.GetPermeability();
+    std::ofstream python_file("permeability.txt");
+    for (double val : permeability)
+        python_file << val << "\n";
+    python_file.close();
 
     Array<int> ess_bdr(pmesh.bdr_attributes.Max());
     ess_bdr = 1;
+    ess_bdr[1] = 0;
+    ess_bdr[3] = 0;
+
+    Array<int> top_bdr(ess_bdr.Size());
+    top_bdr = 0;
+    top_bdr[2] = 1;
+
+    Array<int> bottom_bdr(ess_bdr.Size());
+    bottom_bdr = 0;
+    bottom_bdr[0] = 1;
+
+    ConstantCoefficient zero(0.0);
+    ConstantCoefficient one_percent(-0.01 * 2200.0);
+    Coefficient *top[dim] = {&zero, &one_percent};
+    Coefficient *bottom[dim] = {&zero, &zero};
 
     ParGridFunction x(&fes);
     const int seed = 0;
     x.Randomize(seed);
-    fes.BuildDofToArrays();
-    Array<int> ess_vdof_marker, ess_vdof_list;
-    fes.GetEssentialVDofs(ess_bdr, ess_vdof_marker);
-    FiniteElementSpace::MarkerToList(ess_vdof_marker, ess_vdof_list);
-    for (int vdof : ess_vdof_list)
-        x[vdof] = 0.0;
+    x.ProjectBdrCoefficient(top, top_bdr);
+    x.ProjectBdrCoefficient(bottom, bottom_bdr);
 
     VectorFunctionCoefficient rhs(dim, rhs_func);
     ParLinearForm b(&fes);
@@ -291,7 +296,7 @@ int main(int argc, char *argv[])
     double q_mu(1.0);
     double q_lambda(1.0);
     ParBilinearForm a(&fes);
-    a.AddDomainIntegrator(new ElasticityIntegrator(conduct, q_lambda, q_mu));
+    a.AddDomainIntegrator(new ElasticityIntegrator(perm, q_lambda, q_mu));
     a.Assemble();
 
     const bool keep_diag = true;
@@ -322,10 +327,6 @@ int main(int argc, char *argv[])
     pcg.SetPrintLevel(1);
     pcg.Mult(*B, *X);
     x.Distribute(*X);
-
-    VectorFunctionCoefficient sol(dim, sol_func);
-    double error = x.ComputeL2Error(sol);
-    SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %12.5e\n\n", error);
 
     std::ostringstream sol_name;
     sol_name << "sol1." << std::setfill('0') << std::setw(6) << myid;
@@ -384,8 +385,8 @@ int main(int argc, char *argv[])
 
     // reset the values in X
     x.Randomize(seed);
-    for (int vdof : ess_vdof_list)
-        x[vdof] = 0.0;
+    x.ProjectBdrCoefficient(top, top_bdr);
+    x.ProjectBdrCoefficient(bottom, bottom_bdr);
     x.GetTrueDofs(*X);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
@@ -393,9 +394,6 @@ int main(int argc, char *argv[])
     const int iter = tg_run(*A, agg_part_rels, *X, *B, max_iter,
         rel_tol, 0.0, 1.0, level->tg_data, false);
     x.Distribute(*X);
-
-    error = x.ComputeL2Error(sol);
-    SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %12.5e\n\n", error);
 
     sol_name.str("");
     sol_name.clear();
@@ -408,8 +406,8 @@ int main(int argc, char *argv[])
 //////////////////////////////////////////////////////////////////////////////////////////////
 
     x.Randomize(seed);
-    for (int vdof : ess_vdof_list)
-        x[vdof] = 0.0;
+    x.ProjectBdrCoefficient(top, top_bdr);
+    x.ProjectBdrCoefficient(bottom, bottom_bdr);
     x.GetTrueDofs(*X);
 
     Solver *amge = new VCycleSolver(level->tg_data, false); // interactive_mode
@@ -418,9 +416,6 @@ int main(int argc, char *argv[])
     pcg.SetOperator(*A);
     pcg.Mult(*B, *X);
     x.Distribute(*X);
-
-    error = x.ComputeL2Error(sol);
-    SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %12.5e\n\n", error);
 
     sol_name.str("");
     sol_name.clear();
