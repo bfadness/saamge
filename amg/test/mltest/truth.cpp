@@ -392,7 +392,7 @@ int main(int argc, char *argv[])
     ess_bdr = 1;
 
     ParGridFunction x(&fes);
-    FunctionCoefficient bdr_coeff(bdr_cond);
+    FunctionCoefficient bdr(bdr_cond);
     const int seed = 0;
     x.Randomize(seed);
 
@@ -402,7 +402,7 @@ int main(int argc, char *argv[])
     b.AddDomainIntegrator(new DomainLFIntegrator(rhs));
     b.AddBdrFaceIntegrator(
         new DGDirichletLFIntegrator(
-            bdr_coeff, sigma, kappa), ess_bdr);
+            bdr, sigma, kappa), ess_bdr);
     b.Assemble();
 
     ParBilinearForm a(&fes);
