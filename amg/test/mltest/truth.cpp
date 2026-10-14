@@ -409,10 +409,6 @@ int main(int argc, char *argv[])
     a.EliminateEssentialBC(ess_bdr, x, b, keep_diag);
     a.Finalize();
 
-    Vector true_x(fes.GetTrueVSize());
-    true_x = 0.0;
-    Vector true_rhs(true_x.Size());
-
     std::unique_ptr<HypreParVector> X(x.GetTrueDofs());
     std::unique_ptr<HypreParVector> B(b.ParallelAssemble());
     std::unique_ptr<HypreParMatrix> A(a.ParallelAssemble());
