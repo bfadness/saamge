@@ -195,6 +195,22 @@ private:
     const mfem::Array<mfem::Matrix *>& elem_matrs;
 };
 
+class ElementMatrixLocalGeometric : public ElementMatrixProvider
+{
+public:
+    ElementMatrixLocalGeometric(const agg_partitioning_relations_t &agg_part_rels,
+                                mfem::ParBilinearForm *form)
+    mfem::Matrix *GetMatrix(int elno, bool &free_matr) const override;
+    mfem::Matrix *BuildAEStiff(int elno) const override;
+
+    GetLocalFacets(const int elno);
+private:
+    mfem::ParBilinearform *form;
+    Array<int> facet_to_bdr_elem;
+    Array<int> local_int_facets;
+    Array<int> local_bdr_elems;
+};
+
 } // namespace saamge
 
 #endif // _ELMAT_HPP
