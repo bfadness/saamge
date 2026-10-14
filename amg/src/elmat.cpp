@@ -29,12 +29,16 @@
     <http://www.gnu.org/licenses/>.
 */
 
-#include "common.hpp"
 #include "elmat.hpp"
-#include <mfem.hpp>
+
 #include "aggregates.hpp"
+#include "common.hpp"
 #include "levels.hpp"
+#include "fem.hpp"
 #include "mbox.hpp"
+
+#include <mfem.hpp>
+#include <unordered_map>
 
 namespace saamge
 {
@@ -297,6 +301,139 @@ Matrix * ElementMatrixArray::GetMatrix(
 
     free_matr = false;
     return elem_matrs[elno];
+}
+
+ElementMatrixLocalGeometric::ElementMatrixLocalGeometric(
+    const agg_partitioning_relations_t &agg_part_rels,
+    mfem::BilinearForm *form)
+    :
+    ElementMatrixProvider(agg_part_rels),
+    form(form)
+{
+    fes = form->FESpace();
+    mesh = fes->GetMesh();
+    facet_to_bdr_elem.SetSize(mesh->GetNumFaces());
+    facet_to_bdr_elem = -1;
+
+    const int num_bdr_elems = mesh->GetNBE();
+    for (int bdr_elem_idx = 0; bdr_elem_idx < num_bdr_elems; ++bdr_elem_idx)
+    {
+        // The method works for all dimensions just like
+        // GetNumFaces() even though its name is inconsistent
+        const int facet_idx = mesh->GetBdrElementEdgeIndex(bdr_elem_idx);
+        facet_to_bdr_elem[facet_idx] = bdr_elem_idx;
+    }
+}
+
+mfem::Matrix *ElementMatrixLocalGeometric::GetMatrix(int elno, bool &free_matr) const
+{
+    DenseMatrix *elmat = new DenseMatrix();
+    form->ComputeElementMatrix(elno, *elmat);
+    free_matr = true;
+    return elmat;
+}
+
+Matrix *ElementMatrixLocalGeometric::BuildAEStiff(int elno) const
+{
+    mfem::SparseMatrix *AE_stiffm = agg_build_AE_stiffm(elno, agg_part_rels, this);
+
+    int *dofs = agg_part_rels.AE_to_dof->GetRow(elno);
+    const int num_dofs = agg_part_rels.AE_to_dof->RowSize(elno);
+    SparseMatrix AE_facetm(num_dofs);
+
+    // Is the finite element space continuous?
+    bool continuous = false;
+    for (int i = 0; i < num_dofs; ++i)
+    {
+        if (agg_part_rels.dof_to_elem->RowSize(dofs[i]) > 1)
+        {
+            continuous = true;
+            break;
+        }
+    }
+
+    // Impose essential boundary conditions
+    if (continuous)
+    {
+        int *row_ptr = AE_stiffm->GetI();
+        int *col_map = AE_stiffm->GetJ();
+        double *values = AE_stiffm->GetData();
+
+        for (int i = 0; i < num_dofs; ++i)
+        {
+            if (agg_is_dof_on_essential_border(agg_part_rels, dofs[i]))
+            {
+                for (int j = row_ptr[i]; j < row_ptr[i+1]; ++j)
+                {
+                    const int col_idx = col_map[j];
+                    if (col_idx != i)
+                    {
+                        values[j] = 0.0;
+                        // Jump to row col_idx and look for column index i
+                        for (int k = row_ptr[col_idx]; k < row_ptr[col_idx+1]; ++k)
+                        {
+                            if (col_map[k] == i)
+                            {
+                                values[k] = 0.0;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return AE_stiffm;
+    }
+    else
+    {
+        PartitionLocalFacets(elno);
+        agg_build_AE_facetm(
+            elno, agg_part_rels, form, local_int_facets, local_bdr_elems, AE_facetm);
+        mfem::SparseMatrix *mat = Add(*AE_stiffm, AE_facetm);
+        return mat;
+    }
+}
+
+void ElementMatrixLocalGeometric::PartitionLocalFacets(int elno) const
+{
+    std::unordered_map<int, int> visit_count;
+    const int *elems = agg_part_rels.AE_to_elem->GetRow(elno);
+    const int num_elems = agg_part_rels.AE_to_elem->RowSize(elno);
+    const int num_facets_per_elem = 3; // triangles
+    visit_count.reserve(num_elems * num_facets_per_elem);
+
+    Table elem_to_facet;
+    if (2 < mesh->Dimension())
+        elem_to_facet = mesh->ElementToFaceTable();
+    else
+        elem_to_facet = mesh->ElementToEdgeTable();
+
+    for (int i = 0; i < num_elems; ++i)
+    {
+        const int elem_idx = elems[i];
+        const int *facets = elem_to_facet.GetRow(elem_idx);
+        const int num_facets = elem_to_facet.RowSize(elem_idx);
+
+        for (int j = 0; j < num_facets; ++j)
+        {
+            visit_count[facets[j]]++;
+        }
+    }
+
+    for (const std::pair<const int, int> &key_value: visit_count)
+    {
+        const int facet_index = key_value.first;
+        const int count = key_value.second;
+
+        if (2 == count)
+        {
+            local_int_facets.Append(facet_index);
+        }
+        else if (-1 != facet_to_bdr_elem[facet_index])
+        {
+            local_bdr_elems.Append(facet_to_bdr_elem[facet_index]);
+        }
+    }
 }
 
 } // namespace saamge

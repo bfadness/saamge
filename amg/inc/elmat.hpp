@@ -195,6 +195,27 @@ private:
     const mfem::Array<mfem::Matrix *>& elem_matrs;
 };
 
+class ElementMatrixLocalGeometric : public ElementMatrixProvider
+{
+public:
+    ElementMatrixLocalGeometric(const agg_partitioning_relations_t &agg_part_rels,
+                                mfem::BilinearForm *form);
+    mfem::Matrix *GetMatrix(int elno, bool &free_matr) const override;
+    mfem::Matrix *BuildAEStiff(int elno) const override;
+
+    void PartitionLocalFacets(int elno) const;
+
+private:
+    mfem::BilinearForm *form;
+    mfem::FiniteElementSpace *fes;
+    mfem::Mesh *mesh;
+    mfem::Array<int> facet_to_bdr_elem;
+
+    // need mutable because PartitionLocalFacets must be const
+    mutable mfem::Array<int> local_int_facets;
+    mutable mfem::Array<int> local_bdr_elems;
+};
+
 } // namespace saamge
 
 #endif // _ELMAT_HPP
