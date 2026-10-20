@@ -1396,6 +1396,91 @@ SparseMatrix *agg_build_AE_stiffm(
     return AE_stiffm;
 }
 
+void agg_build_AE_facetm(int part, const agg_partitioning_relations_t& agg_part_rels,
+    BilinearForm *form, Array<int> &local_int_facets,
+    Array<int> &local_bdr_elems, SparseMatrix &facetm)
+{
+    FiniteElementSpace *fes = form->FESpace();
+    Mesh *mesh = fes->GetMesh();
+
+    DenseMatrix elmat;
+    Array<int> global_dofs, elem2_dofs, local_dofs;
+
+    FaceElementTransformations *tr;
+    const FiniteElement *fe1, *fe2;
+
+    const Array<BilinearFormIntegrator*> *fbfi = form->GetFBFI();
+    const Array<BilinearFormIntegrator*> *bfbfi = form->GetBFBFI();
+
+    for (int facet_idx : local_int_facets)
+    {
+        tr = mesh->GetFaceElementTransformations(facet_idx);
+
+        fes->GetElementVDofs(tr->Elem1No, global_dofs);
+        fes->GetElementVDofs(tr->Elem2No, elem2_dofs);
+
+        global_dofs.Append(elem2_dofs);
+        const int num_dofs = global_dofs.Size();
+        local_dofs.SetSize(num_dofs);
+        for (int k = 0; k < num_dofs; ++k)
+        {
+            local_dofs[k] = agg_map_id_glob_to_AE(global_dofs[k], part, agg_part_rels);
+        }
+
+        fe1 = fes->GetFE(tr->Elem1No);
+        fe2 = fes->GetFE(tr->Elem2No);
+        for (int k = 0; k < fbfi->Size(); ++k)
+        {
+            (*fbfi)[k]->AssembleFaceMatrix(*fe1, *fe2, *tr, elmat);
+            for (int i = 0; i < num_dofs; ++i)
+            {
+                const int row_idx = local_dofs[i];
+                for (int j = 0; j < num_dofs; ++j)
+                {
+                    const double val = elmat(i, j);
+                    if (0.0 != val)
+                    {
+                        facetm.Add(row_idx, local_dofs[j], val);
+                    }
+                }
+            }
+        }
+    }
+
+    for (int bdr_elem_idx : local_bdr_elems)
+    {
+        tr = mesh->GetBdrFaceTransformations(bdr_elem_idx);
+
+        fes->GetElementVDofs(tr->Elem1No, global_dofs);
+
+        const int num_dofs = global_dofs.Size();
+        local_dofs.SetSize(num_dofs);
+        for (int k = 0; k < num_dofs; ++k)
+        {
+            local_dofs[k] = agg_map_id_glob_to_AE(global_dofs[k], part, agg_part_rels);
+        }
+
+        fe1 = fes->GetFE(tr->Elem1No);
+        fe2 = fe1; // dummy finite element handled by each bfbfi
+        for (int k = 0; k < bfbfi->Size(); ++k)
+        {
+            (*bfbfi)[k]->AssembleFaceMatrix(*fe1, *fe2, *tr, elmat);
+            for (int i = 0; i < num_dofs; ++i)
+            {
+                const int row_idx = local_dofs[i];
+                for (int j = 0; j < num_dofs; ++j)
+                {
+                    const double val = elmat(i, j);
+                    if (0.0 != val)
+                    {
+                        facetm.Add(row_idx, local_dofs[j], val);
+                    }
+                }
+            }
+        }
+    }
+    facetm.Finalize();
+}
 
 /**
   agglomerate restrict to aggregate (not confusing at all)

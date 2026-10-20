@@ -340,6 +340,10 @@ mfem::SparseMatrix *agg_build_AE_stiffm(
     int part, const agg_partitioning_relations_t& agg_part_rels,
     const ElementMatrixProvider *data, bool skip_zeros=true);
 
+void agg_build_AE_facetm(int part, const agg_partitioning_relations_t& agg_part_rels,
+    mfem::BilinearForm *form, mfem::Array<int> &local_int_facets,
+    mfem::Array<int> &local_bdr_elems, mfem::SparseMatrix &facetm);
+
 /*! \brief Restricts a group of vectors to an aggregate.
 
     Restricts a group of vectors presented as a dense matrix (each column is a
