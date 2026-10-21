@@ -402,11 +402,8 @@ void ElementMatrixLocalGeometric::PartitionLocalFacets(int elno) const
     const int num_facets_per_elem = 3; // triangles
     visit_count.reserve(num_elems * num_facets_per_elem);
 
-    Table elem_to_facet;
-    if (2 < mesh->Dimension())
-        elem_to_facet = mesh->ElementToFaceTable();
-    else
-        elem_to_facet = mesh->ElementToEdgeTable();
+    const Table &elem_to_facet = (2 < mesh->Dimension())
+        ? mesh->ElementToFaceTable() : mesh->ElementToEdgeTable();
 
     for (int i = 0; i < num_elems; ++i)
     {
