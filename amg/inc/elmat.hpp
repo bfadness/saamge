@@ -210,6 +210,8 @@ private:
     mfem::FiniteElementSpace *fes;
     mfem::Mesh *mesh;
     mfem::Array<int> facet_to_bdr_elem;
+    const mfem::Table *elem_to_facet;
+    int num_facets_per_elem;
 
     // need mutable because PartitionLocalFacets must be const
     mutable mfem::Array<int> local_int_facets;

@@ -312,6 +312,12 @@ ElementMatrixLocalGeometric::ElementMatrixLocalGeometric(
 {
     fes = form->FESpace();
     mesh = fes->GetMesh();
+    elem_to_facet = (2 < mesh->Dimension())
+        ? &mesh->ElementToFaceTable() : &mesh->ElementToEdgeTable();
+
+    // assume the mesh has only one type of element
+    num_facets_per_elem = elem_to_facet->RowSize(0);
+
     facet_to_bdr_elem.SetSize(mesh->GetNumFaces());
     facet_to_bdr_elem = -1;
 
@@ -399,19 +405,13 @@ void ElementMatrixLocalGeometric::PartitionLocalFacets(int elno) const
     std::unordered_map<int, int> visit_count;
     const int *elems = agg_part_rels.AE_to_elem->GetRow(elno);
     const int num_elems = agg_part_rels.AE_to_elem->RowSize(elno);
-    const int num_facets_per_elem = 3; // triangles
     visit_count.reserve(num_elems * num_facets_per_elem);
-
-    const Table &elem_to_facet = (2 < mesh->Dimension())
-        ? mesh->ElementToFaceTable() : mesh->ElementToEdgeTable();
 
     for (int i = 0; i < num_elems; ++i)
     {
         const int elem_idx = elems[i];
-        const int *facets = elem_to_facet.GetRow(elem_idx);
-        const int num_facets = elem_to_facet.RowSize(elem_idx);
-
-        for (int j = 0; j < num_facets; ++j)
+        const int *facets = elem_to_facet->GetRow(elem_idx);
+        for (int j = 0; j < num_facets_per_elem; ++j)
         {
             visit_count[facets[j]]++;
         }
