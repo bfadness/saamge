@@ -417,6 +417,8 @@ void ElementMatrixLocalGeometric::PartitionLocalFacets(int elno) const
             visit_count[facets[j]]++;
         }
     }
+    local_int_facets.SetSize(0);
+    local_bdr_elems.SetSize(0);
 
     for (const std::pair<const int, int> &key_value: visit_count)
     {
