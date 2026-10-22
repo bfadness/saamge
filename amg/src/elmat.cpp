@@ -396,6 +396,7 @@ Matrix *ElementMatrixLocalGeometric::BuildAEStiff(int elno) const
         agg_build_AE_facetm(
             elno, agg_part_rels, form, local_int_facets, local_bdr_elems, AE_facetm);
         mfem::SparseMatrix *mat = Add(*AE_stiffm, AE_facetm);
+        delete AE_stiffm;
         return mat;
     }
 }
