@@ -47,7 +47,7 @@ using namespace mfem;
 ElementMatrixStandardGeometric::ElementMatrixStandardGeometric(
     const agg_partitioning_relations_t& agg_part_rels,
     SparseMatrix & assembled_processor_matrix,
-    ParBilinearForm * form) 
+    BilinearForm * form)
     : 
     ElementMatrixProvider(agg_part_rels),
     form(form),
@@ -129,10 +129,7 @@ ElementMatrixParallelCoarse::ElementMatrixParallelCoarse(
     levels_level_t *level) 
     : 
     ElementMatrixProvider(agg_part_rels),
-    level(level)
-{
-    is_geometric = false;
-}
+    level(level) { }
 
 Matrix * ElementMatrixParallelCoarse::BuildAEStiff(int elno) const
 {
@@ -250,10 +247,7 @@ AgglomerateElementMatrixArray::AgglomerateElementMatrixArray(
     const Array<SparseMatrix *>& elem_matrs)
     : 
     ElementMatrixProvider(agg_part_rels),
-    elem_matrs(elem_matrs)
-{
-    is_geometric = false;
-}
+    elem_matrs(elem_matrs) { }
 
 Matrix * AgglomerateElementMatrixArray::BuildAEStiff(int elno) const
 {
@@ -280,10 +274,7 @@ ElementMatrixArray::ElementMatrixArray(
     const Array<Matrix *>& elem_matrs)
     :
     ElementMatrixProvider(agg_part_rels),
-    elem_matrs(elem_matrs)
-{
-    is_geometric = false;
-}
+    elem_matrs(elem_matrs) { }
 
 Matrix * ElementMatrixArray::BuildAEStiff(int elno) const
 {
@@ -329,6 +320,7 @@ ElementMatrixLocalGeometric::ElementMatrixLocalGeometric(
         const int facet_idx = mesh->GetBdrElementEdgeIndex(bdr_elem_idx);
         facet_to_bdr_elem[facet_idx] = bdr_elem_idx;
     }
+    is_geometric = true;
 }
 
 mfem::Matrix *ElementMatrixLocalGeometric::GetMatrix(int elno, bool &free_matr) const

@@ -71,9 +71,11 @@ public:
     virtual mfem::Matrix * BuildAEStiff(int elno) const = 0;
 
     bool IsGeometric() {return is_geometric;}
+    virtual mfem::BilinearForm * GetBilinearForm() const {return nullptr;}
+
 protected:
     const agg_partitioning_relations_t& agg_part_rels;
-    bool is_geometric;
+    bool is_geometric = false;
 };
 
 /**
@@ -105,7 +107,7 @@ private:
 };
 
 /**
-   Standard elmat for fine level, basically uses an mfem::ParBilinearForm
+   Standard elmat for fine level, basically uses an mfem::BilinearForm
    to assemble everything.
 */
 class ElementMatrixStandardGeometric : public ElementMatrixProvider
@@ -119,16 +121,16 @@ public:
     ElementMatrixStandardGeometric(
         const agg_partitioning_relations_t& agg_part_rels,
         mfem::SparseMatrix& assembled_processor_matrix,
-        mfem::ParBilinearForm* form);
+        mfem::BilinearForm* form);
     virtual mfem::Matrix * GetMatrix(int elno, bool& free_matr) const;
     /**
        Just copies (or calls?) agg_build_AE_stiffm_with_global
      */
     virtual mfem::Matrix * BuildAEStiff(int elno) const;
-    mfem::ParBilinearForm* GetParBilinearForm() const {return form;}
+    virtual mfem::BilinearForm * GetBilinearForm() const {return form;}
     void SetBdrCondImposed(bool val) {bdr_cond_imposed_ = val;}
 private:
-    mfem::ParBilinearForm* form;
+    mfem::BilinearForm* form;
     mfem::SparseMatrix& assembled_processor_matrix_;
     /**
        Used to be a CONFIG_CLASS, we will want to set this to false
@@ -202,6 +204,7 @@ public:
                                 mfem::BilinearForm *form);
     mfem::Matrix *GetMatrix(int elno, bool &free_matr) const override;
     mfem::Matrix *BuildAEStiff(int elno) const override;
+    mfem::BilinearForm *GetBilinearForm() const override {return form;}
 
     void PartitionLocalFacets(int elno) const;
 
