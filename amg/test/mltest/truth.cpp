@@ -16,17 +16,17 @@ double tau(2*M_PI);
 
 double sol_func(Vector &x)
 {
-    const double xi(x(0));
-    const double xj(x(1));
-    return sin(tau*xi) * sin(tau*xj);
-    // return 0.0;
+    // const double xi(x(0));
+    // const double xj(x(1));
+    // return sin(tau*xi) * sin(tau*xj);
+    return 0.0;
 }
 
 double rhs_func(Vector &x)
 {
     SA_ASSERT(2 == x.Size());
-    return 2*pow(tau, 2) * sol_func(x);
-    // return 0.0;
+    // return 2*pow(tau, 2) * sol_func(x);
+    return 0.0;
 }
 
 double bdr_cond(Vector &x)
@@ -374,17 +374,17 @@ int main(int argc, char *argv[])
 
     FunctionCoefficient sol(sol_func);
     FunctionCoefficient rhs(rhs_func);
-    ConstantCoefficient conduct(1.0);
+    // ConstantCoefficient conduct(1.0);
     // FunctionCoefficient conduct(checkboard_func);
     // FunctionCoefficient conduct(rotated_channel_func);
-    // MatrixFunctionCoefficient conduct(dim, tensor_func);
-    // FunctionCoefficient trace(trace_func);
+    MatrixFunctionCoefficient conduct(dim, tensor_func);
+    FunctionCoefficient trace(trace_func);
 
     L2_FECollection cfec(0, dim);
     ParFiniteElementSpace cfes(&pmesh, &cfec);
     ParGridFunction conduct_gf(&cfes);
-    conduct_gf.ProjectCoefficient(conduct);
-    // conduct_gf.ProjectCoefficient(trace);
+    // conduct_gf.ProjectCoefficient(conduct);
+    conduct_gf.ProjectCoefficient(trace);
     if (visualize)
         fem_parallel_visualize_gf(pmesh, conduct_gf);
 
@@ -411,8 +411,8 @@ int main(int argc, char *argv[])
     a.AddBdrFaceIntegrator(new DGDiffusionIntegrator(sigma, kappa), ess_bdr);
     a.Assemble();
 
-    const bool keep_diag = true;
-    a.EliminateEssentialBC(ess_bdr, x, b, keep_diag);
+    // const bool keep_diag = true;
+    // a.EliminateEssentialBC(ess_bdr, x, b, keep_diag);
     a.Finalize();
 
     std::unique_ptr<HypreParVector> X(x.GetTrueDofs());
@@ -432,6 +432,7 @@ int main(int argc, char *argv[])
     pcg.SetRelTol(rel_tol); // for some reason MFEM squares this...
     pcg.SetMaxIter(max_iter);
     pcg.SetPrintLevel(1);
+/*
     pcg.Mult(*B, *X);
     x.Distribute(*X);
 
@@ -444,7 +445,7 @@ int main(int argc, char *argv[])
     sol_ofs.precision(8);
     x.Save(sol_ofs);
     sol_ofs.close();
-
+*/
 //////////////////////////////////////////////////////////////////////////////////////////////
 
     // AMGe code begins here
@@ -476,7 +477,8 @@ int main(int argc, char *argv[])
             pmesh, agg_part_rels->partitioning, nparts_arr[0]);
     }
     ElementMatrixProvider *emp(
-        new ElementMatrixStandardGeometric(*agg_part_rels, a.SpMat(), &a));
+        // new ElementMatrixStandardGeometric(*agg_part_rels, a.SpMat(), &a));
+        new ElementMatrixLocalGeometric(*agg_part_rels, &a));
     int polynomial_coarse(minimal_coarse ? 0 : -1);
     MultilevelParameters mlp(
         num_levels-1, nparts_arr, first_nu_pro, nu_pro, nu_relax,
@@ -498,7 +500,7 @@ int main(int argc, char *argv[])
     x.GetTrueDofs(*X);
 
 //////////////////////////////////////////////////////////////////////////////////////////////
-
+/*
     const int iter = tg_run(*A, agg_part_rels, *X, *B, max_iter,
         rel_tol, 0.0, 1.0, level->tg_data, false);
     x.Distribute(*X);
@@ -518,7 +520,7 @@ int main(int argc, char *argv[])
 
     x.Randomize(seed);
     x.GetTrueDofs(*X);
-
+*/
     Solver *amge = new VCycleSolver(level->tg_data, false); // interactive_mode
     amge->SetOperator(*A);
     pcg.SetPreconditioner(*amge);
@@ -526,12 +528,14 @@ int main(int argc, char *argv[])
     pcg.Mult(*B, *X);
     x.Distribute(*X);
 
-    error = x.ComputeL2Error(sol);
+    double error = x.ComputeL2Error(sol);
     SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %12.5e\n\n", error);
 
+    std::ostringstream sol_name;
     sol_name.str("");
     sol_name.clear();
     sol_name << "sol3." << std::setfill('0') << std::setw(6) << myid;
+    std::ofstream sol_ofs(sol_name.str().c_str());
     sol_ofs.open(sol_name.str().c_str());
     sol_ofs.precision(8);
     x.Save(sol_ofs);
