@@ -353,7 +353,8 @@ int main(int argc, char *argv[])
     for (int i=0; i<times_refine; ++i)
         pmesh.UniformRefinement();
 
-    H1_FECollection fec(order, dim);
+    // H1_FECollection fec(order, dim);
+    CrouzeixRaviartFECollection fec;
     ParFiniteElementSpace fes(&pmesh, &fec);
 
     const int pNV = pmesh.GetNV();
@@ -374,17 +375,17 @@ int main(int argc, char *argv[])
 
     FunctionCoefficient sol(sol_func);
     FunctionCoefficient rhs(rhs_func);
-    ConstantCoefficient conduct(1.0);
+    // ConstantCoefficient conduct(1.0);
     // FunctionCoefficient conduct(checkboard_func);
     // FunctionCoefficient conduct(rotated_channel_func);
-    // MatrixFunctionCoefficient conduct(dim, tensor_func);
-    // FunctionCoefficient trace(trace_func);
+    MatrixFunctionCoefficient conduct(dim, tensor_func);
+    FunctionCoefficient trace(trace_func);
 
     L2_FECollection cfec(0, dim);
     ParFiniteElementSpace cfes(&pmesh, &cfec);
     ParGridFunction conduct_gf(&cfes);
-    conduct_gf.ProjectCoefficient(conduct);
-    // conduct_gf.ProjectCoefficient(trace);
+    // conduct_gf.ProjectCoefficient(conduct);
+    conduct_gf.ProjectCoefficient(trace);
     if (visualize)
         fem_parallel_visualize_gf(pmesh, conduct_gf);
 
@@ -426,9 +427,9 @@ int main(int argc, char *argv[])
     pcg.SetRelTol(rel_tol); // for some reason MFEM squares this...
     pcg.SetMaxIter(max_iter);
     pcg.SetPrintLevel(1);
+/*
     pcg.Mult(*B, *X);
     x.Distribute(*X);
-
     double error = x.ComputeL2Error(sol);
     SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %12.5e\n\n", error);
 
@@ -438,7 +439,7 @@ int main(int argc, char *argv[])
     sol_ofs.precision(8);
     x.Save(sol_ofs);
     sol_ofs.close();
-
+*/
 //////////////////////////////////////////////////////////////////////////////////////////////
 
     // AMGe code begins here
@@ -486,7 +487,7 @@ int main(int argc, char *argv[])
 
     // argument 0 means fine level
     levels_level_t *level = levels_list_get_level(ml_data->levels_list, 0);
-
+/*
     // reset the values in X
     x.Randomize(seed);
     x.ProjectBdrCoefficient(bdr_coeff, ess_bdr);
@@ -514,7 +515,7 @@ int main(int argc, char *argv[])
     x.Randomize(seed);
     x.ProjectBdrCoefficient(bdr_coeff, ess_bdr);
     x.GetTrueDofs(*X);
-
+*/
     Solver *amge = new VCycleSolver(level->tg_data, false); // interactive_mode
     amge->SetOperator(*A);
     pcg.SetPreconditioner(*amge);
@@ -522,12 +523,14 @@ int main(int argc, char *argv[])
     pcg.Mult(*B, *X);
     x.Distribute(*X);
 
-    error = x.ComputeL2Error(sol);
+    double error = x.ComputeL2Error(sol);
     SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %12.5e\n\n", error);
 
+    std::ostringstream sol_name;
     sol_name.str("");
     sol_name.clear();
     sol_name << "sol3." << std::setfill('0') << std::setw(6) << myid;
+    std::ofstream sol_ofs(sol_name.str().c_str());
     sol_ofs.open(sol_name.str().c_str());
     sol_ofs.precision(8);
     x.Save(sol_ofs);
