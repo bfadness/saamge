@@ -360,12 +360,13 @@ int main(int argc, char *argv[])
     for (int i=0; i<times_refine; ++i)
         pmesh.UniformRefinement();
 
-    H1_FECollection fec(order, dim);
+    L2_FECollection fec(order, dim);
     ParFiniteElementSpace fes(&pmesh, &fec, dim, Ordering::byVDIM);
 
     const int pNV = pmesh.GetNV();
     const int pNE = pmesh.GetNE();
-    const int pND = fes.GetNDofs();
+    // const int pND = fes.GetNDofs();
+    const int pND = fes.GetVSize();
     const int gNE = pmesh.GetGlobalNE();
     const int gND = fes.GlobalTrueVSize();
 
@@ -399,17 +400,29 @@ int main(int argc, char *argv[])
     ParGridFunction x(&fes);
     x = 0.0;
 
+    const double alpha = -1.0;
+    // const double kappa = (order + 1) * (order + dim);
+    const double kappa = 6.0;
     VectorFunctionCoefficient rhs(dim, rhs_func);
     ParLinearForm b(&fes);
     b.AddDomainIntegrator(new VectorDomainLFIntegrator(rhs));
+    VectorFunctionCoefficient sol(dim, sol_func);
+    b.AddBdrFaceIntegrator(
+        new DGElasticityDirichletLFIntegrator(
+            sol, conduct, conduct, alpha, kappa), ess_bdr);
     b.Assemble();
 
     ParBilinearForm a(&fes);
-    a.AddDomainIntegrator(new ElasticityIntegrator(conduct, q_lambda, q_mu));
+    // a.AddDomainIntegrator(new ElasticityIntegrator(conduct, q_lambda, q_mu));
+    a.AddDomainIntegrator(new ElasticityIntegrator(conduct, conduct));
+    a.AddInteriorFaceIntegrator(
+        new DGElasticityIntegrator(conduct, conduct, alpha, kappa));
+    a.AddBdrFaceIntegrator(
+        new DGElasticityIntegrator(conduct, conduct, alpha, kappa), ess_bdr);
     a.Assemble();
 
-    const bool keep_diag = true;
-    a.EliminateEssentialBC(ess_bdr, x, b, keep_diag);
+    // const bool keep_diag = true;
+    // a.EliminateEssentialBC(ess_bdr, x, b, keep_diag);
     a.Finalize();
 
     std::unique_ptr<HypreParVector> X(x.GetTrueDofs());
@@ -421,7 +434,7 @@ int main(int argc, char *argv[])
     amg.SetPrintLevel(0);
 
     // use the same tolerance for all conjugate gradient runs
-    const double rel_tol = 1e-6;
+    const double rel_tol = 1e-12;
     const double max_iter = 1000;
 
     CGSolver pcg(active_comm);
@@ -433,7 +446,7 @@ int main(int argc, char *argv[])
     pcg.Mult(*B, *X);
     x.Distribute(*X);
 
-    VectorFunctionCoefficient sol(dim, sol_func);
+    // VectorFunctionCoefficient sol(dim, sol_func);
     double error = x.ComputeL2Error(sol);
     SA_RPRINTF_NOTS(0, "<<<< |u_h - u|_2 = %12.5e\n\n", error);
 
@@ -475,7 +488,8 @@ int main(int argc, char *argv[])
             pmesh, agg_part_rels->partitioning, nparts_arr[0]);
     }
     ElementMatrixProvider *emp(
-        new ElementMatrixStandardGeometric(*agg_part_rels, a.SpMat(), &a));
+        // new ElementMatrixStandardGeometric(*agg_part_rels, a.SpMat(), &a));
+        new ElementMatrixLocalGeometric(*agg_part_rels, &a));
     int polynomial_coarse(minimal_coarse ? 0 : -1);
     MultilevelParameters mlp(
         num_levels-1, nparts_arr, first_nu_pro, nu_pro, nu_relax,
