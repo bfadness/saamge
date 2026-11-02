@@ -417,7 +417,7 @@ ml_data_t * ml_produce_data(
         SA_ASSERT(elem_data_finest->IsGeometric());
         BilinearForm * form = elem_data_finest->GetBilinearForm();
         FiniteElementSpace * fes = form->FESpace();
-        Mesh * mesh = fes->GetMesh();
+        // Mesh * mesh = fes->GetMesh();
         // whew, getting that pmesh was a lot of work...
         bool use_spectral;
         if (mlp.get_theta(0) <= 0.0)
@@ -426,7 +426,7 @@ ml_data_t * ml_produce_data(
             use_spectral = true;
 
         tg_build_hierarchy_with_polynomial(
-            Ag, *mesh, *tg_data, *agg_part_rels,
+            Ag, *fes, *tg_data, *agg_part_rels,
             elem_data_finest, tg_data->polynomial_coarse_space,
             use_spectral, mlp.get_avoid_ess_bdr_dofs());
     }

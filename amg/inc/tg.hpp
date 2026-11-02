@@ -450,7 +450,7 @@ void tg_assemble_and_smooth(mfem::HypreParMatrix &Ag,
   See tg_build_hierarchy() for other parameters
 */
 void tg_build_hierarchy_with_polynomial(
-    mfem::HypreParMatrix& Ag, mfem::Mesh& mesh, tg_data_t& tg_data,
+    mfem::HypreParMatrix& Ag, mfem::FiniteElementSpace& fes, tg_data_t& tg_data,
     const agg_partitioning_relations_t& agg_part_rels,
     ElementMatrixProvider *elem_data, int polynomial_order, bool use_spectral,
     bool avoid_ess_bdr_dofs);

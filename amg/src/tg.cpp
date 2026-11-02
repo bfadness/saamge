@@ -447,7 +447,7 @@ void tg_assemble_and_smooth(HypreParMatrix &Ag,
 }
 
 void tg_build_hierarchy_with_polynomial(
-    HypreParMatrix& Ag, Mesh& mesh, tg_data_t& tg_data,
+    HypreParMatrix& Ag, FiniteElementSpace& fes, tg_data_t& tg_data,
     const agg_partitioning_relations_t& agg_part_rels,
     ElementMatrixProvider *elem_data, int polynomial_order, bool use_spectral,
     bool avoid_ess_bdr_dofs)
@@ -461,13 +461,14 @@ void tg_build_hierarchy_with_polynomial(
 
     // GetNV() should be GetNNodes() or something that does not exist,
     // this will not work for higher order as is...
-    Vector nodes;
-    mesh.GetNodes(nodes);
+    Mesh * mesh = fes.GetMesh();
+    GridFunction nodes(&fes);
+    mesh->GetNodes(nodes);
     tg_data.doing_spectral = use_spectral;
     tg_data.elem_data = elem_data;
     tg_data.ltent_interp = interp_build_composite(
         agg_part_rels, *tg_data.interp_data, elem_data, tg_data.theta,
-        mesh.SpaceDimension(), mesh.GetNV(), nodes, polynomial_order,
+        mesh->SpaceDimension(), fes.GetNDofs(), nodes, polynomial_order,
         avoid_ess_bdr_dofs, use_spectral);
 
     SA_ASSERT(tg_data.ltent_interp);
