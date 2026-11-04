@@ -298,6 +298,8 @@ int main(int argc, char *argv[])
     args.AddOption(&adapt, "-ad", "--adapt",
                    "-nad", "--no-adapt",
                    "Perturbs the matrix and reuses the spaces.");
+    double kappa = 0.0;
+    args.AddOption(&kappa, "-k", "--kappa", "Set dG penalty parameter.");
 
     args.Parse();
     if (!args.Good())
@@ -401,8 +403,8 @@ int main(int argc, char *argv[])
     x = 0.0;
 
     const double alpha = -1.0;
-    // const double kappa = (order + 1) * (order + dim);
-    const double kappa = 6.0;
+    if (!kappa)
+        kappa = (order + 1) * (order + dim);
     VectorFunctionCoefficient rhs(dim, rhs_func);
     ParLinearForm b(&fes);
     b.AddDomainIntegrator(new VectorDomainLFIntegrator(rhs));
