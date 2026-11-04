@@ -291,6 +291,8 @@ int main(int argc, char *argv[])
     args.AddOption(&adapt, "-ad", "--adapt",
                    "-nad", "--no-adapt",
                    "Perturbs the matrix and reuses the spaces.");
+    double kappa = 0.0;
+    args.AddOption(&kappa, "-k", "--kappa", "Set the dG penalty parameter.");
 
     args.Parse();
     if (!args.Good())
@@ -397,7 +399,8 @@ int main(int argc, char *argv[])
     x.Randomize(seed);
 
     const double sigma = -1.0;
-    const double kappa = (order + 1) * (order + dim);
+    if (!kappa)
+        kappa = (order + 1) * (order + dim);
     ParLinearForm b(&fes);
     b.AddDomainIntegrator(new DomainLFIntegrator(rhs));
     b.AddBdrFaceIntegrator(
