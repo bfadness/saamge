@@ -273,7 +273,7 @@ void smpr_tg(HypreParMatrix& A, const Vector& b, Vector& x, void *data)
 
     tg_cycle_atb(A, *(tg_data->Ac), *(tg_data->interp), *(tg_data->restr), B,
                  tg_data->pre_smoother, tg_data->post_smoother, X,
-                 *tg_data->coarse_solver, tg_data->poly_data);
+                 *tg_data->coarse_solver, tg_data->smoother_data);
 }
 
 double *smpr_oneminusx_poly_roots(int& nu, int *degree)

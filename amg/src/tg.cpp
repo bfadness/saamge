@@ -158,7 +158,7 @@ double tg_calc_res_tgprod(HypreParMatrix& A, HypreParVector& b,
 
     tg_cycle_atb(A, *(tg_data->Ac), *(tg_data->interp), *(tg_data->restr), *res,
                  tg_data->pre_smoother, tg_data->post_smoother, *psres,
-                 *tg_data->coarse_solver, tg_data->poly_data);
+                 *tg_data->coarse_solver, tg_data->smoother_data);
 
     mbox_make_owner_data(*res);
     mbox_make_owner_partitioning(*res);
@@ -204,7 +204,7 @@ double tg_fullrecalc_res_tgprod(HypreParMatrix& A, HypreParVector& b,
     psres = 0.;
     tg_cycle_atb(A, *(tg_data->Ac), *(tg_data->interp), *(tg_data->restr), res,
                  tg_data->pre_smoother, tg_data->post_smoother, psres,
-                 *tg_data->coarse_solver, tg_data->poly_data);
+                 *tg_data->coarse_solver, tg_data->smoother_data);
     rr = mbox_parallel_inner_product(psres, res);
     A.Mult(x, res);
     subtract(b, res, res);
@@ -245,7 +245,7 @@ int tg_solve(HypreParMatrix& A, HypreParVector& b, HypreParVector& x,
         (*x_prev) = x;
         tg_cycle_atb(A, *(tg_data->Ac), *(tg_data->interp), *(tg_data->restr), b,
                      tg_data->pre_smoother, tg_data->post_smoother, x,
-                     *tg_data->coarse_solver, tg_data->poly_data);
+                     *tg_data->coarse_solver, tg_data->smoother_data);
 
         rr_prev = rr;
         rr = tg_recalc_res_tgprod(A, b, x, *x_prev, *res, *psres, tg_data);
@@ -385,6 +385,9 @@ tg_data_t *tg_init_data(
     tg_data->interp_data->drop_tol = smooth_drop_tol;
     if (0 != A.Height() && 0 != A.Width())
         tg_data->poly_data = smpr_init_poly_data(A, nu_relax, 0.0);
+
+    tg_data->smoother_data = tg_data->poly_data;
+    tg_data->free_smoother_data = nullptr;
 
     tg_data->smooth_interp = smooth_interp;
 
@@ -908,6 +911,8 @@ tg_data_t *tg_produce_data(
 void tg_free_data(tg_data_t *tg_data)
 {
     if (!tg_data) return;
+    if (tg_data->free_smoother_data && tg_data->smoother_data)
+        tg_data->free_smoother_data(tg_data->smoother_data);
     smpr_free_poly_data(tg_data->poly_data);
     interp_free_data(tg_data->interp_data, tg_data->doing_spectral,
                      tg_data->theta);
@@ -930,6 +935,7 @@ tg_data_t *tg_copy_data(const tg_data_t *src)
     dst->interp_data = interp_copy_data(src->interp_data);
     dst->pre_smoother = src->pre_smoother;
     dst->post_smoother = src->post_smoother;
+    dst->free_smoother_data = src->free_smoother_data;
 
     dst->coarse_solver = src->coarse_solver;
     dst->Ac = mbox_clone_parallel_matrix(src->Ac);
@@ -940,6 +946,10 @@ tg_data_t *tg_copy_data(const tg_data_t *src)
     dst->interp = mbox_clone_parallel_matrix(src->interp);
     dst->restr = mbox_clone_parallel_matrix(src->restr);
     dst->poly_data = smpr_copy_poly_data(src->poly_data);
+    if (src->smoother_data == src->poly_data)
+        dst->smoother_data = dst->poly_data;
+    else
+        SA_ASSERT(false);
     dst->smooth_interp = src->smooth_interp;
     dst->theta = src->theta;
 

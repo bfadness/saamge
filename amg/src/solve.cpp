@@ -319,7 +319,7 @@ void VCycleSolver::Mult(const Vector &b, Vector &x) const
     SA_ASSERT(tg_data->coarse_solver);
     tg_cycle_atb(*A, *(tg_data->Ac), *(tg_data->interp), *(tg_data->restr), b,
                  tg_data->pre_smoother, tg_data->post_smoother, x,
-                 *tg_data->coarse_solver, tg_data->poly_data);
+                 *tg_data->coarse_solver, tg_data->smoother_data);
 }
 
 /**
@@ -339,7 +339,7 @@ void solve_spd_Vcycle(HypreParMatrix& A, const HypreParVector& b, HypreParVector
     // x = 0.; // whoever calls this now has to 0 x, ATB 29 May 2015
     tg_cycle_atb(A, *(tg_data->Ac), *(tg_data->interp), *(tg_data->restr), b,
                  tg_data->pre_smoother, tg_data->post_smoother, x,
-                 *tg_data->coarse_solver, tg_data->poly_data);
+                 *tg_data->coarse_solver, tg_data->smoother_data);
 }
 
 void solve_spd_Wcycle(HypreParMatrix& A, const HypreParVector& b, HypreParVector& x,
