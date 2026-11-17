@@ -29,14 +29,20 @@
     <http://www.gnu.org/licenses/>.
 */
 
-#include "common.hpp"
 #include "smpr.hpp"
 #define _USE_MATH_DEFINES
+
+#include <algorithm>        // std::sort, std::unique
 #include <cmath>
 #include <mfem.hpp>
-#include "tg.hpp"
+#include <utility>          // std::pair
+#include <vector>
+
+#include "common.hpp"
 #include "helpers.hpp"
 #include "mbox.hpp"
+#include "tg.hpp"
+
 using std::sqrt;
 using std::sin;
 using std::cos;
@@ -476,6 +482,173 @@ smpr_poly_data_t *smpr_copy_poly_data(const smpr_poly_data_t *src)
     dst->interp_data = src->interp_data;
     dst->agg_part_rels = src->agg_part_rels;
     dst->schur_smoother = src->schur_smoother;
+    return dst;
+}
+
+smpr_block_data_t *smpr_init_block_data(
+    const HypreParMatrix &A,
+    const agg_partitioning_relations_t &agg_part_rels,
+    const Mesh &mesh,
+    int num_sweeps)
+{
+    SA_ASSERT(agg_part_rels.AE_to_dof);
+    SA_ASSERT(agg_part_rels.elem_to_dof);
+    SA_ASSERT(agg_part_rels.elem_to_AE);
+
+    SparseMatrix Alocal;
+    A.GetDiag(Alocal);
+
+    const int num_blocks = agg_part_rels.AE_to_dof->Size();
+    const int num_tdofs = Alocal.Height();
+
+    smpr_block_data_t *data = new smpr_block_data_t;
+    data->num_blocks = num_blocks;
+    data->num_sweeps = num_sweeps;
+    data->block_solvers.SetSize(num_blocks);
+    data->block_solvers = nullptr;
+    data->inv_sqrt_mult.SetSize(num_tdofs);
+
+    const Table &elem_to_face = (mesh.Dimension() > 2)
+        ? mesh.ElementToFaceTable()
+        : mesh.ElementToEdgeTable();
+
+    Table face_to_elem;
+    Transpose(elem_to_face, face_to_elem);
+
+    // Intermediate storage for the overlapping block dofs
+    std::vector<std::pair<int, int>> flat_pairs;
+
+    // The vector holds duplicates,
+    // so we want to reserve an adequate capacity,
+    // especially in three dimensions
+    flat_pairs.reserve(2 * num_tdofs);
+
+    SA_ASSERT(agg_part_rels.Dof_TrueDof != nullptr);
+    SparseMatrix dof_owned_tdof;
+    agg_part_rels.Dof_TrueDof->GetDiag(dof_owned_tdof);
+    SA_ASSERT(dof_owned_tdof.Width() == num_tdofs);
+    SA_ASSERT(agg_part_rels.AE_to_dof->Width() == dof_owned_tdof.Height());
+    SA_ASSERT(agg_part_rels.elem_to_dof->Width() == dof_owned_tdof.Height());
+
+    // Helper lambda adds true dofs after getting from local dofs
+    auto append_owned_tdofs = [&](int block, int dof)
+    {
+        const int *owned_tdofs = dof_owned_tdof.GetRowColumns(dof);
+        const int num_owned_tdofs = dof_owned_tdof.RowSize(dof);
+        for (int k = 0; k < num_owned_tdofs; ++k)
+            flat_pairs.emplace_back(block, owned_tdofs[k]);
+    };
+
+    for (int i = 0; i < num_blocks; ++i)
+    {
+        const int *dofs = agg_part_rels.AE_to_dof->GetRow(i);
+        const int num_dofs = agg_part_rels.AE_to_dof->RowSize(i);
+        for (int j = 0; j < num_dofs; ++j)
+            append_owned_tdofs(i, dofs[j]);
+    }
+
+    const int num_faces = face_to_elem.Size();
+    for (int face_index = 0; face_index < num_faces; ++face_index)
+    {
+        if (face_to_elem.RowSize(face_index) < 2)
+            continue;
+
+        const int *elems = face_to_elem.GetRow(face_index);
+        const int elem1_index = elems[0];
+        const int elem2_index = elems[1];
+
+        const int block1 = agg_part_rels.elem_to_AE->GetRow(elem1_index)[0];
+        const int block2 = agg_part_rels.elem_to_AE->GetRow(elem2_index)[0];
+
+        if (block1 == block2)
+            continue;
+
+        // Add the overlapping tdofs to each block
+        const int *elem2_dofs = agg_part_rels.elem_to_dof->GetRow(elem2_index);
+        const int num_elem2_dofs = agg_part_rels.elem_to_dof->RowSize(elem2_index);
+        for (int j = 0; j < num_elem2_dofs; ++j)
+            append_owned_tdofs(block1, elem2_dofs[j]);
+
+        const int *elem1_dofs = agg_part_rels.elem_to_dof->GetRow(elem1_index);
+        const int num_elem1_dofs = agg_part_rels.elem_to_dof->RowSize(elem1_index);
+        for (int j = 0; j < num_elem1_dofs; ++j)
+            append_owned_tdofs(block2, elem1_dofs[j]);
+    }
+
+    // We need to sort the dofs so that std::unique
+    // can push duplicates to the end in a single pass
+    std::sort(flat_pairs.begin(), flat_pairs.end());
+    flat_pairs.erase(std::unique(flat_pairs.begin(), flat_pairs.end()), flat_pairs.end());
+
+    // The multiplicity of a DoF is the
+    // number of blocks to which it belongs
+    Array<int> mult(num_tdofs);
+    mult = 0;
+
+    const size_t total_unique = flat_pairs.size();
+    int *block_ptr = new int[num_blocks + 1](); // Parentheses zero initialize
+    int *block_tdof_map = new int[total_unique];
+
+    for (size_t i = 0; i < total_unique; ++i)
+    {
+        const int block = flat_pairs[i].first;
+        const int tdof = flat_pairs[i].second;
+        block_ptr[block + 1] += 1;
+        block_tdof_map[i] = tdof;
+        mult[tdof] += 1;
+    }
+
+    for (int i = 0; i < num_blocks; ++i)
+        block_ptr[i + 1] += block_ptr[i];
+    data->block_tdofs.SetIJ(block_ptr, block_tdof_map, num_blocks);
+
+    data->inv_sqrt_mult = 1.0;
+    for (int i = 0; i < num_tdofs; ++i)
+    {
+        if (mult[i] > 1)
+            data->inv_sqrt_mult(i) = 1.0 / sqrt((double)mult[i]);
+    }
+
+    DenseMatrix block_mat;
+    for (int i = 0; i < num_blocks; ++i)
+    {
+        Array<int> block_tdofs(data->block_tdofs.GetRow(i), data->block_tdofs.RowSize(i));
+        SA_ASSERT(block_tdofs.Size());
+        block_mat.SetSize(block_tdofs.Size());
+        Alocal.GetSubMatrix(block_tdofs, block_tdofs, block_mat);
+        data->block_solvers[i] = new DenseMatrixInverse(block_mat);
+    }
+
+    return data;
+}
+
+void smpr_free_block_data(void *data)
+{
+    if (!data)
+        return;
+    smpr_block_data_t *block_data = static_cast<smpr_block_data_t *>(data);
+    for (int i = 0; i < block_data->block_solvers.Size(); ++i)
+        delete block_data->block_solvers[i];
+    delete block_data;
+}
+
+smpr_block_data_t *smpr_copy_block_data(const smpr_block_data_t *src)
+{
+    if (!src)
+        return nullptr;
+    smpr_block_data_t *dst = new smpr_block_data_t;
+    dst->num_blocks = src->num_blocks;
+    dst->num_sweeps = src->num_sweeps;
+    dst->block_tdofs = src->block_tdofs;
+    dst->inv_sqrt_mult = src->inv_sqrt_mult;
+    dst->block_solvers.SetSize(src->num_blocks);
+    for (int i = 0; i < src->num_blocks; ++i)
+    {
+        dst->block_solvers[i] = src->block_solvers[i]
+            ? new DenseMatrixInverse(*src->block_solvers[i])
+            : nullptr;
+    }
+
     return dst;
 }
 
