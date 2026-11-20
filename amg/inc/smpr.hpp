@@ -118,7 +118,7 @@ typedef struct {
     int num_blocks;
     int num_sweeps;
     mfem::Table block_dofs;
-    mfem::Array<mfem::DenseMatrixInverse*> block_solvers;
+    mfem::Array<mfem::DenseMatrixInverse *> block_solvers;
     mfem::Vector inv_sqrt_mult;
 } smpr_block_data_t;
 
@@ -313,18 +313,19 @@ void smpr_free_poly_data(smpr_poly_data_t *data);
 smpr_poly_data_t *smpr_copy_poly_data(const smpr_poly_data_t *src);
 
 smpr_block_data_t* smpr_init_block_data(
-    const mfem::HypreParMatrix& A,
-    const agg_partitioning_relations_t& agg_part_rels,
+    const mfem::HypreParMatrix &A,
+    const agg_partitioning_relations_t &agg_part_rels,
+    const mfem::Mesh &mesh,
     int num_sweeps = 1);
 
 void smpr_additive_block(
-    mfem::HypreParMatrix& A,
-    const mfem::Vector& b,
-    mfem::Vector& x,
-    void* data);
+    mfem::HypreParMatrix &A,
+    const mfem::Vector &b,
+    mfem::Vector &x,
+    void *data);
 
 void smpr_free_block_data(void* data);
-smpr_block_data_t* smpr_copy_block_data(const smpr_block_data_t* src);
+smpr_block_data_t *smpr_copy_block_data(const smpr_block_data_t *src);
 
 /* Inline Functions */
 /*! \brief Returns a pointer to Dinv_neg.

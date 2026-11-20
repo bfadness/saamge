@@ -480,102 +480,35 @@ smpr_poly_data_t *smpr_copy_poly_data(const smpr_poly_data_t *src)
     return dst;
 }
 
-smpr_block_data_t* smpr_init_block_data(
-    const mfem::HypreParMatrix& A,
-    const agg_partitioning_relations_t& agg_part_rels,
+smpr_block_data_t *smpr_init_block_data(
+    const HypreParMatrix &A,
+    const agg_partitioning_relations_t &agg_part_rels,
+    const Mesh &mesh,
     int num_sweeps)
 {
+
+    SA_ASSERT(agg_part_rels.AE_to_dof);
+    SA_ASSERT(agg_part_rels.elem_to_dof);
+
     SparseMatrix Alocal;
     A.GetDiag(Alocal);
 
     const int num_blocks = agg_part_rels.AE_to_dof->Size();
     const int num_dofs = Alocal.Height();
 
-    smpr_block_data_t* data = new smpr_block_data_t;
+    smpr_block_data_t *data = new smpr_block_data_t;
     data->num_blocks = num_blocks;
     data->num_sweeps = num_sweeps;
     data->block_solvers.SetSize(num_blocks);
     data->block_solvers = nullptr;
     data->inv_sqrt_mult.SetSize(num_dofs);
 
-    Array<int> mult(num_dofs);
-    mult = 0;
+    const Table &elem_to_face = (mesh.Dimension() > 2)
+        ? mesh.ElementToFaceTable()
+        : mesh.ElementToEdgeTable();
 
-    data->block_dofs.MakeI(num_blocks);
-    std::vector<int> flat_dofs;
-    flat_dofs.reserve(num_dofs + num_dofs / 2);
 
-    Array<int> marker(num_dofs);
-    marker = -1;
 
-    for (int i = 0; i < num_blocks; ++i)
-    {
-        const size_t start = flat_dofs.size();
-
-        const int* agg_dofs = agg_part_rels.AE_to_dof->GetRow(i);
-        const int num_agg_dofs = agg_part_rels.AE_to_dof->RowSize(i);
-
-        for (int j = 0; j < num_agg_dofs; ++j)
-        {
-            const int dof_index = agg_dofs[j];
-            marker[dof_index] = i;
-            flat_dofs.push_back(dof_index);
-        }
-
-        const int* faces = agg_part_rels.AE_to_face->GetRow(i);
-        const int num_faces = agg_part_rels.AE_to_face->RowSize(i);
-
-        for (int j = 0; j < num_faces; ++j)
-        {
-            const int face_index = faces[j];
-            if (agg_part_rels.face_to_elem->RowSize(face_index) < 2)
-                continue;
-            const int* face_elems = agg_part_rels.face_to_elem->GetRow(face_index);
-
-            // Each face is the intersection of only two elements
-            for (int k = 0; k < 2; ++k)
-            {
-                const int elem_index = face_elems[k];
-                if (agg_part_rels.elem_to_AE[elem_index] == i)
-                    continue;
-
-                const int* elem_dofs = agg_part_rels.elem_to_dof->GetRow(elem_index);
-                const int num_elem_dofs = agg_part_rels.elem_to_dof->RowSize(elem_index);
-
-                for (int l = 0; l < num_elem_dofs; ++l)
-                {
-                    const int elem_dof_index = elem_dofs[l];
-                    if (marker[elem_dof_index] != i)
-                    {
-                        marker[elem_dof_index] = i;
-                        flat_dofs.push_back(elem_dof_index);
-                    }
-                }
-            }
-        }
-
-        std::sort(flat_dofs.begin() + start, flat_dofs.end());
-
-        const int count = static_cast<int>(flat_dofs.size() - start);
-        data->block_dofs.AddColumnsInRow(i, count);
-
-        for (size_t j = start; j < flat_dofs.size(); ++j)
-            mult[flat_dofs[j]] += 1;
-    }
-
-    data->block_dofs.MakeJ();
-    std::copy(flat_dofs.begin(), flat_dofs.end(), data->block_dofs.GetJ());
-
-    for (int i = 0; i < num_dofs; ++i)
-        data->inv_sqrt_mult(i) = (mult[i] > 0) ? (1.0 / std::sqrt((double)mult[i])) : 1.0;
-
-    DenseMatrix patch_mat;
-    for (int i = 0; i < num_blocks; ++i)
-    {
-        Array<int> row_dofs(data->block_dofs.GetRow(i), data->block_dofs.RowSize(i));
-        Alocal.GetSubMatrix(row_dofs, row_dofs, patch_mat);
-        data->block_solvers[i] = new DenseMatrixInverse(patch_mat);
-    }
     return data;
 }
 
