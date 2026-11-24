@@ -387,7 +387,6 @@ tg_data_t *tg_init_data(
         tg_data->poly_data = smpr_init_poly_data(A, nu_relax, 0.0);
 
     tg_data->smoother_data = tg_data->poly_data;
-    tg_data->free_smoother_data = nullptr;
 
     tg_data->smooth_interp = smooth_interp;
 
@@ -911,8 +910,6 @@ tg_data_t *tg_produce_data(
 void tg_free_data(tg_data_t *tg_data)
 {
     if (!tg_data) return;
-    if (tg_data->free_smoother_data && tg_data->smoother_data)
-        tg_data->free_smoother_data(tg_data->smoother_data);
     smpr_free_poly_data(tg_data->poly_data);
     interp_free_data(tg_data->interp_data, tg_data->doing_spectral,
                      tg_data->theta);
@@ -935,7 +932,6 @@ tg_data_t *tg_copy_data(const tg_data_t *src)
     dst->interp_data = interp_copy_data(src->interp_data);
     dst->pre_smoother = src->pre_smoother;
     dst->post_smoother = src->post_smoother;
-    dst->free_smoother_data = src->free_smoother_data;
 
     dst->coarse_solver = src->coarse_solver;
     dst->Ac = mbox_clone_parallel_matrix(src->Ac);

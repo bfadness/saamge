@@ -76,7 +76,6 @@ typedef struct {
 
     smpr_poly_data_t *poly_data; /*< The data for the polynomial smoother. */
     void *smoother_data;
-    void (*free_smoother_data)(void *);
 
     bool use_w_cycle; /*!< whether to use W-cycle or V-cycle DEPRECATED */
     /*! -1 indicates usual spectral space, otherwise order of polynomials to include */
