@@ -622,6 +622,55 @@ smpr_block_data_t *smpr_init_block_data(
     return data;
 }
 
+void smpr_additive_block(
+    HypreParMatrix &A,
+    const mfem::Vector &b,
+    Vector &x,
+    void *data)
+{
+    SA_ASSERT(data);
+    smpr_block_data_t *block_data = static_cast<smpr_block_data_t *>(data);
+
+    SA_ASSERT(A.Width() == x.Size());
+    SA_ASSERT(A.Height() == b.Size());
+    SA_ASSERT(x.Size() == b.Size());
+    SA_ASSERT(block_data->inv_sqrt_mult.Size() == x.Size());
+
+    const int num_tdofs = b.Size();
+
+    Vector res(num_tdofs);
+    Vector dx(num_tdofs);
+    Vector block_res;
+    Vector block_dx;
+
+    const double *weights = block_data->inv_sqrt_mult.GetData();
+    const double *dx_data = dx.GetData();
+    double *res_data = res.GetData();
+    double *x_data = x.GetData();
+
+    for (int i = 0; i < block_data->num_sweeps; ++i)
+    {
+        A.Mult(x, res);
+        subtract(b, res, res);
+        for (int j = 0; j < num_tdofs; ++j)
+            res_data[j] *= weights[j];
+
+        dx = 0.0;
+        for (int j = 0; j < block_data->num_blocks; ++j)
+        {
+            const int block_size = block_data->block_tdofs.RowSize(j);
+            Array<int> block_tdofs(block_data->block_tdofs.GetRow(j), block_size);
+
+            res.GetSubVector(block_tdofs, block_res);
+            block_data->block_solvers[j]->Mult(block_res, block_dx);
+            dx.AddElementVector(block_tdofs, block_dx);
+        }
+
+        for (int j = 0; j < num_tdofs; ++j)
+            x_data[j] += weights[j] * dx_data[j];
+    }
+}
+
 void smpr_free_block_data(void *data)
 {
     if (!data)
