@@ -431,6 +431,13 @@ tg_data_t *tg_init_data(
     int nu_relax, double theta, bool smooth_interp, double smooth_drop_tol,
     bool use_arpack);
 
+smpr_block_data_t *tg_set_block_smoother(
+    mfem::HypreParMatrix &A,
+    tg_data_t &tg_data,
+    const agg_partitioning_relations_t &agg_part_rels,
+    const mfem::Mesh &mesh,
+    int num_sweeps = 1);
+
 /*! \brief Shared code from tg_build_hierarchy functions */
 void tg_assemble_and_smooth(mfem::HypreParMatrix &Ag,
                             tg_data_t& tg_data,
