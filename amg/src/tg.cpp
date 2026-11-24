@@ -949,7 +949,7 @@ tg_data_t *tg_copy_data(const tg_data_t *src)
     if (src->smoother_data == src->poly_data)
         dst->smoother_data = dst->poly_data;
     else
-        SA_ASSERT(false);
+        dst->smoother_data = src->smoother_data;
     dst->smooth_interp = src->smooth_interp;
     dst->theta = src->theta;
 
