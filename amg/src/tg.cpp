@@ -401,11 +401,10 @@ smpr_block_data_t *tg_set_block_smoother(
     mfem::HypreParMatrix &A,
     tg_data_t &tg_data,
     const agg_partitioning_relations_t &agg_part_rels,
-    const mfem::Mesh &mesh,
     int num_sweeps)
 {
     smpr_block_data_t *block_data =
-        smpr_init_block_data(A, agg_part_rels, mesh, num_sweeps);
+        smpr_init_block_data(A, agg_part_rels, num_sweeps);
     tg_data.pre_smoother = smpr_additive_block;
     tg_data.post_smoother = smpr_additive_block;
     tg_data.smoother_data = block_data;

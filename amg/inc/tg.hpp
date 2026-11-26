@@ -435,7 +435,6 @@ smpr_block_data_t *tg_set_block_smoother(
     mfem::HypreParMatrix &A,
     tg_data_t &tg_data,
     const agg_partitioning_relations_t &agg_part_rels,
-    const mfem::Mesh &mesh,
     int num_sweeps = 1);
 
 /*! \brief Shared code from tg_build_hierarchy functions */

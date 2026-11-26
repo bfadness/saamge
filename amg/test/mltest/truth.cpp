@@ -497,7 +497,7 @@ int main(int argc, char *argv[])
     smpr_block_data_t *block_data = nullptr;
     if (block_smoother)
         block_data = tg_set_block_smoother(
-            *A, *level->tg_data, *agg_part_rels, pmesh, num_sweeps);
+            *A, *level->tg_data, *agg_part_rels, num_sweeps);
 
     // reset the values in X
     x.Randomize(seed);
