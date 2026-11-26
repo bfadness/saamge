@@ -34,10 +34,11 @@
 #ifndef _SMPR_HPP
 #define _SMPR_HPP
 
-#include "common.hpp"
 #include <mfem.hpp>
-#include "mbox.hpp"
+
+#include "common.hpp"
 #include "interp.hpp"
+#include "mbox.hpp"
 
 namespace saamge
 {
@@ -113,6 +114,13 @@ typedef struct {
     agg_partitioning_relations_t *agg_part_rels; /*!< Associated with the Schur complement. Not owned by this structure. */
     smpr_ft schur_smoother; /*!< Smoother for the Schur complement. */
 } smpr_poly_data_t;
+
+typedef struct {
+    int num_blocks;
+    int num_sweeps;
+    mfem::Table block_tdofs;
+    mfem::Array<mfem::DenseMatrixInverse *> block_solvers;
+} smpr_block_data_t;
 
 /**
    @brief Puts smpr_ft in an MFEM style.
@@ -303,6 +311,20 @@ void smpr_free_poly_data(smpr_poly_data_t *data);
              \b smpr_free_poly_data.
 */
 smpr_poly_data_t *smpr_copy_poly_data(const smpr_poly_data_t *src);
+
+smpr_block_data_t *smpr_init_block_data(
+    const mfem::HypreParMatrix &A,
+    const agg_partitioning_relations_t &agg_part_rels,
+    int num_sweeps = 1);
+
+void smpr_additive_block(
+    mfem::HypreParMatrix &A,
+    const mfem::Vector &b,
+    mfem::Vector &x,
+    void *data);
+
+void smpr_free_block_data(void *data);
+smpr_block_data_t *smpr_copy_block_data(const smpr_block_data_t *src);
 
 /* Inline Functions */
 /*! \brief Returns a pointer to Dinv_neg.

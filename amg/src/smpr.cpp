@@ -29,14 +29,17 @@
     <http://www.gnu.org/licenses/>.
 */
 
-#include "common.hpp"
 #include "smpr.hpp"
 #define _USE_MATH_DEFINES
-#include <cmath>
+
+#include <cmath>            // std::abs
 #include <mfem.hpp>
-#include "tg.hpp"
+
+#include "common.hpp"
 #include "helpers.hpp"
 #include "mbox.hpp"
+#include "tg.hpp"
+
 using std::sqrt;
 using std::sin;
 using std::cos;
@@ -273,7 +276,7 @@ void smpr_tg(HypreParMatrix& A, const Vector& b, Vector& x, void *data)
 
     tg_cycle_atb(A, *(tg_data->Ac), *(tg_data->interp), *(tg_data->restr), B,
                  tg_data->pre_smoother, tg_data->post_smoother, X,
-                 *tg_data->coarse_solver, tg_data->poly_data);
+                 *tg_data->coarse_solver, tg_data->smoother_data);
 }
 
 double *smpr_oneminusx_poly_roots(int& nu, int *degree)
@@ -476,6 +479,179 @@ smpr_poly_data_t *smpr_copy_poly_data(const smpr_poly_data_t *src)
     dst->interp_data = src->interp_data;
     dst->agg_part_rels = src->agg_part_rels;
     dst->schur_smoother = src->schur_smoother;
+    return dst;
+}
+
+smpr_block_data_t *smpr_init_block_data(
+    const HypreParMatrix &A,
+    const agg_partitioning_relations_t &agg_part_rels,
+    int num_sweeps)
+{
+    SA_ASSERT(agg_part_rels.AE_to_dof);
+
+    SparseMatrix Alocal;
+    A.GetDiag(Alocal);
+
+    const int num_blocks = agg_part_rels.AE_to_dof->Size();
+    const int num_tdofs = Alocal.Height();
+
+    smpr_block_data_t *data = new smpr_block_data_t;
+    data->num_blocks = num_blocks;
+    data->num_sweeps = num_sweeps;
+    data->block_solvers.SetSize(num_blocks);
+    data->block_solvers = nullptr;
+
+    SA_ASSERT(agg_part_rels.Dof_TrueDof != nullptr);
+    hypre_ParCSRMatrix *dof_tdof = *agg_part_rels.Dof_TrueDof;
+    hypre_CSRMatrix *dof_owned_tdof = hypre_ParCSRMatrixDiag(dof_tdof);
+    const HYPRE_Int *row_ptr = hypre_CSRMatrixI(dof_owned_tdof);
+    const HYPRE_Int *cols = hypre_CSRMatrixJ(dof_owned_tdof);
+    const HYPRE_Int num_rows = hypre_CSRMatrixNumRows(dof_owned_tdof);
+    SA_ASSERT(agg_part_rels.AE_to_dof->Width() == num_rows);
+
+    data->block_tdofs.MakeI(num_blocks);
+    for (int i = 0; i < num_blocks; ++i)
+    {
+        const int *dofs = agg_part_rels.AE_to_dof->GetRow(i);
+        const int ndofs = agg_part_rels.AE_to_dof->RowSize(i);
+        for (int j = 0; j < ndofs; ++j)
+        {
+            const int dof = dofs[j];
+            data->block_tdofs.AddColumnsInRow(i, row_ptr[dof + 1] - row_ptr[dof]);
+        }
+    }
+    data->block_tdofs.MakeJ();
+    for (int i = 0; i < num_blocks; ++i)
+    {
+        const int *dofs = agg_part_rels.AE_to_dof->GetRow(i);
+        const int ndofs = agg_part_rels.AE_to_dof->RowSize(i);
+        for (int j = 0; j < ndofs; ++j)
+        {
+            const int dof = dofs[j];
+            for (HYPRE_Int k = row_ptr[dof]; k < row_ptr[dof + 1]; ++k)
+                data->block_tdofs.AddConnection(i, cols[k]);
+        }
+    }
+    data->block_tdofs.ShiftUpI();
+    data->block_tdofs.Finalize();
+
+    SparseMatrix Aoffd;
+    HYPRE_Int *cmap = nullptr;
+    A.GetOffd(Aoffd, cmap);
+
+    Array<int> off_block(num_tdofs);
+    off_block = 1;
+
+    DenseMatrix block_mat;
+    for (int i = 0; i < num_blocks; ++i)
+    {
+        const int block_size = data->block_tdofs.RowSize(i);
+        SA_ASSERT(block_size);
+        Array<int> block_tdofs(data->block_tdofs.GetRow(i), block_size);
+
+        for (int j = 0; j < block_size; ++j)
+            off_block[block_tdofs[j]] = 0;
+
+        block_mat.SetSize(block_size);
+        Alocal.GetSubMatrix(block_tdofs, block_tdofs, block_mat);
+
+        for (int j = 0; j < block_size; ++j)
+        {
+            const int tdof = block_tdofs[j];
+            double l1_ext = 0.0;
+
+            const int *cols = Alocal.GetRowColumns(tdof);
+            const int ncols = Alocal.RowSize(tdof);
+            const double *vals = Alocal.GetRowEntries(tdof);
+            for (int k = 0; k < ncols; ++k)
+            {
+                if (off_block[cols[k]])
+                    l1_ext += std::abs(vals[k]);
+            }
+
+            const int noffd = Aoffd.RowSize(tdof);
+            const double *offd_vals = Aoffd.GetRowEntries(tdof);
+            for (int k = 0; k < noffd; ++k)
+                l1_ext += std::abs(offd_vals[k]);
+
+            block_mat(j, j) += l1_ext;
+        }
+
+        for (int j = 0; j < block_size; ++j)
+            off_block[block_tdofs[j]] = 1;
+
+        data->block_solvers[i] = new DenseMatrixInverse(block_mat);
+    }
+
+    return data;
+}
+
+void smpr_additive_block(
+    HypreParMatrix &A,
+    const mfem::Vector &b,
+    Vector &x,
+    void *data)
+{
+    SA_ASSERT(data);
+    smpr_block_data_t *block_data = static_cast<smpr_block_data_t *>(data);
+
+    SA_ASSERT(A.Width() == x.Size());
+    SA_ASSERT(A.Height() == b.Size());
+    SA_ASSERT(x.Size() == b.Size());
+
+    const int num_tdofs = b.Size();
+
+    Vector res(num_tdofs);
+    Vector dx(num_tdofs);
+    Vector block_res;
+    Vector block_dx;
+
+    for (int i = 0; i < block_data->num_sweeps; ++i)
+    {
+        A.Mult(x, res);
+        subtract(b, res, res);
+
+        dx = 0.0;
+        for (int j = 0; j < block_data->num_blocks; ++j)
+        {
+            const int block_size = block_data->block_tdofs.RowSize(j);
+            Array<int> block_tdofs(block_data->block_tdofs.GetRow(j), block_size);
+
+            res.GetSubVector(block_tdofs, block_res);
+            block_data->block_solvers[j]->Mult(block_res, block_dx);
+            dx.AddElementVector(block_tdofs, block_dx);
+        }
+
+        x += dx;
+    }
+}
+
+void smpr_free_block_data(void *data)
+{
+    if (!data)
+        return;
+    smpr_block_data_t *block_data = static_cast<smpr_block_data_t *>(data);
+    for (int i = 0; i < block_data->block_solvers.Size(); ++i)
+        delete block_data->block_solvers[i];
+    delete block_data;
+}
+
+smpr_block_data_t *smpr_copy_block_data(const smpr_block_data_t *src)
+{
+    if (!src)
+        return nullptr;
+    smpr_block_data_t *dst = new smpr_block_data_t;
+    dst->num_blocks = src->num_blocks;
+    dst->num_sweeps = src->num_sweeps;
+    dst->block_tdofs = src->block_tdofs;
+    dst->block_solvers.SetSize(src->num_blocks);
+    for (int i = 0; i < src->num_blocks; ++i)
+    {
+        dst->block_solvers[i] = src->block_solvers[i]
+            ? new DenseMatrixInverse(*src->block_solvers[i])
+            : nullptr;
+    }
+
     return dst;
 }
 

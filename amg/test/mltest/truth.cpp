@@ -293,6 +293,13 @@ int main(int argc, char *argv[])
                    "Perturbs the matrix and reuses the spaces.");
     double kappa = 0.0;
     args.AddOption(&kappa, "-k", "--kappa", "Set the dG penalty parameter.");
+    bool block_smoother = false;
+    args.AddOption(&block_smoother, "-bs", "--block-smoother",
+                   "-nbs", "--no-block-smoother",
+                   "Use overlapping additive block smoother on finest level.");
+    int num_sweeps = 1;
+    args.AddOption(&num_sweeps, "-ns", "--num-sweeps",
+                   "Number of block smoother sweeps.");
 
     args.Parse();
     if (!args.Good())
@@ -498,6 +505,11 @@ int main(int argc, char *argv[])
     // argument 0 means fine level
     levels_level_t *level = levels_list_get_level(ml_data->levels_list, 0);
 
+    smpr_block_data_t *block_data = nullptr;
+    if (block_smoother)
+        block_data = tg_set_block_smoother(
+            *A, *level->tg_data, *agg_part_rels, num_sweeps);
+
     // reset the values in X
     x.Randomize(seed);
     x.GetTrueDofs(*X);
@@ -546,6 +558,7 @@ int main(int argc, char *argv[])
 
     delete amge;
     ml_free_data(ml_data);
+    smpr_free_block_data(block_data);
     agg_free_partitioning(agg_part_rels);
     delete []nparts_arr;
 
